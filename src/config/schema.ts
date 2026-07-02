@@ -89,6 +89,8 @@ export const configSchema = z.strictObject({
       iterationTimeoutMs: z.number().int().positive().default(3_600_000),
       /** Abort when the provider emits no events for this long. */
       idleTimeoutMs: z.number().int().positive().default(600_000),
+      /** Concurrent worktrees for plans marked `parallel: true`. */
+      maxParallelPlans: z.number().int().positive().default(2),
     })
     .default({
       maxIterations: 20,
@@ -99,6 +101,7 @@ export const configSchema = z.strictObject({
       backoffMs: [5_000, 30_000, 120_000],
       iterationTimeoutMs: 3_600_000,
       idleTimeoutMs: 600_000,
+      maxParallelPlans: 2,
     }),
   review: z
     .strictObject({
@@ -131,8 +134,10 @@ export const configSchema = z.strictObject({
       windows: z.array(z.string().regex(TIME_WINDOW_RE)).default([]),
       /** Days of week (0 = Sunday) the windows apply to. Unset = every day. */
       days: z.array(z.number().int().min(0).max(6)).optional(),
+      /** How long the daemon naps after an idle stop before re-checking the BACKLOG. */
+      idleCooldownMs: z.number().int().positive().default(300_000),
     })
-    .default({ windows: [] }),
+    .default({ windows: [], idleCooldownMs: 300_000 }),
 });
 
 export type NightcrewConfig = z.infer<typeof configSchema>;

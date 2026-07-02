@@ -154,7 +154,7 @@ describe("single-project vertical slice", () => {
     expect(failed.verify?.passed).toBe(false);
 
     const state = readState(project.ctx().paths);
-    expect(state.pendingRepair?.reason).toBe("verify_failed");
+    expect(Object.values(state.pendingRepairs)[0]?.reason).toBe("verify_failed");
     expect(state.streaks.failure).toBe(1);
 
     const repaired = await project.run(); // auto-resolves to repair
@@ -162,7 +162,7 @@ describe("single-project vertical slice", () => {
     expect(repaired.status).toBe("success");
     expect(repaired.merged).toBe(true);
     expect(readState(project.ctx().paths).streaks.failure).toBe(0);
-    expect(readState(project.ctx().paths).pendingRepair).toBeUndefined();
+    expect(readState(project.ctx().paths).pendingRepairs).toEqual({});
   });
 
   it("types idle_timeout and timeout failures distinctly", async () => {
@@ -181,7 +181,9 @@ describe("single-project vertical slice", () => {
     const stalled = await project.run();
     expect(stalled.status).toBe("failed");
     expect(stalled.failure?.kind).toBe("idle_timeout");
-    expect(readState(project.ctx().paths).pendingRepair?.reason).toBe("idle_timeout");
+    expect(Object.values(readState(project.ctx().paths).pendingRepairs)[0]?.reason).toBe(
+      "idle_timeout",
+    );
 
     project.cleanup();
     project = await makeTempProject({
@@ -249,7 +251,9 @@ describe("single-project vertical slice", () => {
     const conflicted = await project.run(); // execute #2 completes → merge conflicts
     expect(conflicted.status).toBe("failed");
     expect(conflicted.failure?.kind).toBe("merge_conflict");
-    expect(readState(project.ctx().paths).pendingRepair?.reason).toBe("merge_conflict");
+    expect(Object.values(readState(project.ctx().paths).pendingRepairs)[0]?.reason).toBe(
+      "merge_conflict",
+    );
 
     const repaired = await project.run(); // repair merges main into the worktree and resolves
     expect(repaired.operation).toBe("repair");

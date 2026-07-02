@@ -64,7 +64,7 @@ export function createConsoleServer(options: ConsoleOptions): Server {
     try {
       if (req.method === "GET" && (path === "/" || path === "/index.html")) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(consoleHtml());
+        res.end(consoleHtml(options.actions ?? false));
         return;
       }
 

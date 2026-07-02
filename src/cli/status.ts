@@ -18,10 +18,8 @@ export async function printStatus(ctx: ProjectContext): Promise<void> {
     flags.push(pc.yellow(`paused${state.pausedReason ? `: ${state.pausedReason}` : ""}`));
   if (state.resumeAt) flags.push(pc.yellow(`quota resume at ${state.resumeAt}`));
   if (state.stop) flags.push(pc.red(`stopped: ${state.stop.reason} — ${state.stop.detail ?? ""}`));
-  if (state.pendingRepair) {
-    flags.push(
-      pc.magenta(`pending repair: ${state.pendingRepair.reason} (${state.pendingRepair.planId})`),
-    );
+  for (const repair of Object.values(state.pendingRepairs)) {
+    flags.push(pc.magenta(`pending repair: ${repair.reason} (${repair.planId})`));
   }
   if (flags.length > 0) console.log(flags.map((f) => `  ${f}`).join("\n"));
 

@@ -90,5 +90,14 @@ describe("console API", () => {
     const resumed = await fetch(`${base}/api/projects/demo/resume`, { method: "POST" });
     expect(resumed.status).toBe(200);
     expect(readState(project.ctx().paths).paused).toBe(false);
+
+    const gc = await fetch(`${base}/api/projects/demo/gc`, { method: "POST" });
+    expect(gc.status).toBe(200);
+    const gcBody = (await gc.json()) as { ok: boolean; removedWorktrees: string[] };
+    expect(gcBody.ok).toBe(true);
+
+    // Action buttons only render when actions are enabled.
+    const page = await (await fetch(`${base}/`)).text();
+    expect(page).toContain("var ACTIONS = true");
   });
 });

@@ -161,7 +161,8 @@ export interface RuntimeState {
   };
   iterationsSinceGarden: number;
   lastOperation?: Operation;
-  pendingRepair?: PendingRepair;
+  /** planId -> pending repair. One slot per plan so parallel plans fail independently. */
+  pendingRepairs: Record<string, PendingRepair>;
   /** planId -> completed merge-review rounds for the current landing attempt. */
   reviewRounds: Record<string, number>;
   stop?: { reason: StopReason; at: string; detail?: string };
@@ -176,6 +177,7 @@ export function defaultRuntimeState(): RuntimeState {
     sessions: {},
     streaks: { failure: 0, noCommit: 0, controlOnly: 0 },
     iterationsSinceGarden: 0,
+    pendingRepairs: {},
     reviewRounds: {},
     updatedAt: new Date().toISOString(),
   };

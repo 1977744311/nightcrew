@@ -3,7 +3,7 @@
  * API, subscribes to SSE, renders with plain DOM. No build step by design —
  * the console must never be the thing that breaks overnight.
  */
-export function consoleHtml(): string {
+export function consoleHtml(actions = false): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -58,6 +58,10 @@ export function consoleHtml(): string {
   .muted { color: var(--dim); }
   .plans li { margin: 2px 0; }
   .plans .pid { color: var(--blue); }
+  .actions { display: inline-flex; gap: 8px; margin-left: 12px; }
+  .actions button { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+                    border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .actions button:hover { border-color: #35405a; }
 </style>
 </head>
 <body>
@@ -68,8 +72,29 @@ export function consoleHtml(): string {
 </header>
 <main id="app"><div class="muted">loading…</div></main>
 <script>
+var ACTIONS = ${actions ? "true" : "false"};
 var app = document.getElementById("app");
 var es = null;
+
+function post(name, action) {
+  fetch("/api/projects/" + encodeURIComponent(name) + "/" + action, { method: "POST" })
+    .then(function () { route(); });
+}
+
+function actionButtons(name, state) {
+  if (!ACTIONS) return [];
+  var buttons = [];
+  if (state && state.paused) {
+    buttons.push(h("button", { onclick: function (e) { e.stopPropagation(); post(name, "resume"); } }, ["resume"]));
+  } else {
+    buttons.push(h("button", { onclick: function (e) { e.stopPropagation(); post(name, "pause"); } }, ["pause"]));
+  }
+  if (state && state.stop) {
+    buttons.push(h("button", { onclick: function (e) { e.stopPropagation(); post(name, "resume"); } }, ["clear stop"]));
+  }
+  buttons.push(h("button", { onclick: function (e) { e.stopPropagation(); post(name, "gc"); } }, ["gc"]));
+  return [h("span", { class: "actions" }, buttons)];
+}
 
 function h(tag, attrs, children) {
   var el = document.createElement(tag);
@@ -93,7 +118,8 @@ function stateBadges(s) {
   if (s.paused) out.push(h("span", { class: "badge warn" }, ["paused"]));
   if (s.resumeAt) out.push(h("span", { class: "badge warn" }, ["quota → " + fmtTime(s.resumeAt)]));
   if (s.stop) out.push(h("span", { class: "badge bad" }, ["stopped: " + s.stop.reason]));
-  if (s.pendingRepair) out.push(h("span", { class: "badge warn" }, ["repair: " + s.pendingRepair.reason]));
+  var repairs = s.pendingRepairs ? Object.keys(s.pendingRepairs) : [];
+  if (repairs.length) out.push(h("span", { class: "badge warn" }, ["repair: " + repairs.join(", ")]));
   if (out.length === 0) out.push(h("span", { class: "badge ok" }, ["ready"]));
   return out;
 }
@@ -159,7 +185,7 @@ function renderDetail(d) {
   app.replaceChildren(
     h("div", {}, [
       h("a", { class: "back", href: "#/" }, ["← all projects"]),
-      h("h2", {}, [d.name].concat(stateBadges(d.state))),
+      h("h2", {}, [d.name].concat(stateBadges(d.state)).concat(actionButtons(d.name, d.state))),
       h("div", { class: "kv" }, [
         "streaks: failure=" + d.state.streaks.failure +
         " noCommit=" + d.state.streaks.noCommit +

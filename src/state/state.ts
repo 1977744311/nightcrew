@@ -9,6 +9,12 @@ export function readState(paths: ProjectPaths): RuntimeState {
   try {
     const parsed = JSON.parse(raw) as RuntimeState;
     if (parsed.version !== 1) return defaultRuntimeState();
+    // Tolerate older/partial state files: runtime state is disposable.
+    parsed.sessions ??= {};
+    parsed.pendingRepairs ??= {};
+    parsed.reviewRounds ??= {};
+    parsed.streaks ??= { failure: 0, noCommit: 0, controlOnly: 0 };
+    parsed.iterationsSinceGarden ??= 0;
     return parsed;
   } catch {
     // Corrupt runtime state is disposable by contract: start fresh.

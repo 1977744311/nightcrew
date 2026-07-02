@@ -2,19 +2,53 @@ import { resolve } from "node:path";
 import { Command } from "commander";
 import pc from "picocolors";
 import { version } from "../../package.json";
-import { loadProject } from "../config/load";
-import { OPERATIONS, type Operation } from "../core/types";
+import { loadProject, type ProjectContext } from "../config/load";
+import { readRegistry } from "../config/registry";
+import { type IterationRecord, OPERATIONS, type Operation } from "../core/types";
 import { runLoop } from "../loop/loop";
 import { runIteration } from "../loop/runner";
 import { findPlan, listPlans } from "../plans/plans";
 import { buildProvider } from "../providers/factory";
 import { buildReviewer } from "../review/factory";
+import { acquireProjectLock, lockHolder } from "../state/lock";
 import { updateState } from "../state/state";
 import { initProject } from "./init";
 import { printStatus } from "./status";
 
 function rootOf(options: { root?: string }): string {
   return resolve(options.root ?? process.cwd());
+}
+
+function formatRecord(record: IterationRecord): string {
+  const status =
+    record.status === "success"
+      ? pc.green("success")
+      : record.status === "failed"
+        ? pc.red(`failed:${record.failure?.kind}`)
+        : pc.yellow(record.status);
+  return (
+    `${pc.dim(record.startedAt.slice(11, 19))} ${record.operation.padEnd(7)} ${status}` +
+    `${record.planId ? ` ${pc.dim(record.planId)}` : ""} ` +
+    pc.dim(`${record.commits.length} commits${record.merged ? ", merged" : ""}`)
+  );
+}
+
+function withProjectLock<T>(ctx: ProjectContext, role: string, fn: () => Promise<T>): Promise<T> {
+  const release = acquireProjectLock(ctx.paths, role);
+  if (!release) {
+    const holder = lockHolder(ctx.paths);
+    throw new Error(
+      `another process is driving this project (pid ${holder?.pid}, ${holder?.role}); ` +
+        "stop it first or wait for it to finish",
+    );
+  }
+  return fn().finally(release);
+}
+
+function rootByName(name: string): string {
+  const project = readRegistry().projects.find((candidate) => candidate.name === name);
+  if (!project) throw new Error(`project "${name}" is not registered (see \`crew status\`)`);
+  return project.root;
 }
 
 export function buildProgram(): Command {
@@ -47,10 +81,12 @@ export function buildProgram(): Command {
         const ctx = loadProject(rootOf(options));
         const provider = buildProvider(ctx.config, ctx.root);
         const reviewer = buildReviewer(ctx.config, provider, ctx.root);
-        const record = await runIteration(
-          ctx,
-          { provider, reviewer },
-          { operation: options.operation as Operation | undefined, planId: options.plan },
+        const record = await withProjectLock(ctx, "run", () =>
+          runIteration(
+            ctx,
+            { provider, reviewer },
+            { operation: options.operation as Operation | undefined, planId: options.plan },
+          ),
         );
         if (options.json) {
           console.log(JSON.stringify(record, null, 2));
@@ -84,26 +120,16 @@ export function buildProgram(): Command {
       const reviewer = buildReviewer(ctx.config, provider, ctx.root);
       const controller = new AbortController();
       process.on("SIGINT", () => controller.abort());
-      const result = await runLoop(
-        ctx,
-        { provider, reviewer },
-        {
-          maxIterations: options.maxIterations ? Number(options.maxIterations) : undefined,
-          signal: controller.signal,
-          onRecord: (record) => {
-            const status =
-              record.status === "success"
-                ? pc.green("success")
-                : record.status === "failed"
-                  ? pc.red(`failed:${record.failure?.kind}`)
-                  : pc.yellow(record.status);
-            console.log(
-              `${pc.dim(record.startedAt.slice(11, 19))} ${record.operation.padEnd(7)} ${status}` +
-                `${record.planId ? ` ${pc.dim(record.planId)}` : ""} ` +
-                pc.dim(`${record.commits.length} commits${record.merged ? ", merged" : ""}`),
-            );
+      const result = await withProjectLock(ctx, "loop", () =>
+        runLoop(
+          ctx,
+          { provider, reviewer },
+          {
+            maxIterations: options.maxIterations ? Number(options.maxIterations) : undefined,
+            signal: controller.signal,
+            onRecord: (record) => console.log(formatRecord(record)),
           },
-        },
+        ),
       );
       console.log(
         `loop finished after ${result.iterations} iterations` +
@@ -204,6 +230,111 @@ export function buildProgram(): Command {
       if (!doc) throw new Error(`plan "${id}" not found`);
       console.log(pc.dim(`# ${doc.file} (${doc.status})`));
       console.log(doc.body);
+    });
+
+  const crew = program
+    .command("crew")
+    .description("multi-project daemon (also available as the `crew` bin)");
+
+  crew
+    .command("start")
+    .description("drive all registered projects (schedule windows apply)")
+    .option("--projects <names>", "comma-separated subset of registered projects")
+    .option("--now", "ignore schedule windows and start immediately")
+    .option("--poll <ms>", "scheduler poll interval", "15000")
+    .option("--console", "also serve the web console (with actions enabled)")
+    .option("--port <port>", "console port", "4711")
+    .action(
+      async (options: {
+        projects?: string;
+        now?: boolean;
+        poll: string;
+        console?: boolean;
+        port: string;
+      }) => {
+        const { runCrewDaemon } = await import("../scheduler/daemon");
+        const controller = new AbortController();
+        process.on("SIGINT", () => controller.abort());
+        process.on("SIGTERM", () => controller.abort());
+        if (options.console) {
+          const { createConsoleServer } = await import("../console/server");
+          createConsoleServer({ port: Number(options.port), actions: true });
+        }
+        const result = await runCrewDaemon({
+          projects: options.projects?.split(",").map((name) => name.trim()),
+          signal: controller.signal,
+          pollMs: Number(options.poll),
+          ignoreWindows: options.now ?? false,
+          onRecord: (record) =>
+            console.log(`${pc.dim(`[${record.projectName}]`)} ${formatRecord(record)}`),
+        });
+        for (const project of result.projects) {
+          console.log(
+            `${project.name}: ${project.iterations} iterations${project.error ? pc.red(` (${project.error})`) : ""}`,
+          );
+        }
+      },
+    );
+
+  crew
+    .command("status")
+    .description("one-line status for every registered project")
+    .action(async () => {
+      const { registeredProjects, summarize } = await import("../console/data");
+      const projects = registeredProjects();
+      if (projects.length === 0) {
+        console.log("no projects registered — run `nightcrew init` in a repo");
+        return;
+      }
+      for (const project of projects) {
+        const summary = summarize(project);
+        if (!summary.ok) {
+          console.log(`${pc.bold(project.name.padEnd(20))} ${pc.red(`error: ${summary.error}`)}`);
+          continue;
+        }
+        const state = summary.state;
+        const flags: string[] = [];
+        if (state?.paused) flags.push(pc.yellow("paused"));
+        if (state?.resumeAt) flags.push(pc.yellow("quota-wait"));
+        if (state?.stop) flags.push(pc.red(`stopped:${state.stop.reason}`));
+        if (flags.length === 0) flags.push(pc.green("ready"));
+        const last = summary.lastIteration;
+        console.log(
+          `${pc.bold(project.name.padEnd(20))} ${flags.join(" ")} ` +
+            pc.dim(
+              `plans ${summary.activePlans} active/${summary.completedPlans} done` +
+                (last
+                  ? `  last: ${last.operation} ${last.status} ${last.startedAt.slice(5, 16)}`
+                  : ""),
+            ),
+        );
+      }
+    });
+
+  crew
+    .command("pause <name>")
+    .description("pause a registered project by name")
+    .option("--reason <text>", "why")
+    .action(async (name: string, options: { reason?: string }) => {
+      const ctx = loadProject(rootByName(name));
+      updateState(ctx.paths, (state) => {
+        state.paused = true;
+        state.pausedReason = options.reason ?? "paused via crew";
+      });
+      console.log(`${name}: paused`);
+    });
+
+  crew
+    .command("resume <name>")
+    .description("resume a registered project by name")
+    .action(async (name: string) => {
+      const ctx = loadProject(rootByName(name));
+      updateState(ctx.paths, (state) => {
+        state.paused = false;
+        state.pausedReason = undefined;
+        state.stop = undefined;
+      });
+      console.log(`${name}: resumed`);
     });
 
   return program;

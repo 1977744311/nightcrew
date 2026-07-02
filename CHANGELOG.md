@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.0
+
+Phase 3 — The crew: multi-project daemon, parallel plans, schedule windows.
+
+- `crew start`: one daemon drives every registered project concurrently, one
+  scheduler per project; `--projects` filters, `--now` ignores windows,
+  `--console` serves the web console with actions enabled.
+- Parallel plans: plans marked `parallel: true` run in concurrent worktree
+  lanes (bounded by `loop.max_parallel_plans`); serial plans queue; control
+  ops (plan/garden) require exclusive occupancy. Per-plan repair state
+  (`pendingRepairs` map) and defensive state merging keep concurrent lanes
+  from clobbering each other's sessions, repairs, or the serial cursor.
+- Schedule windows: `schedule.windows` (`"23:00-07:00"` wraps midnight and
+  belongs to its start day) and `schedule.days`; outside the window the
+  scheduler waits instead of running; `schedule.idle_cooldown_ms` naps after
+  an idle stop before re-consulting the BACKLOG.
+- Cross-process project lock (`runtime/daemon.lock`, stale-pid reclaim) plus
+  in-process holder registry: `run`, `loop`, and the daemon refuse to
+  double-drive a project.
+- Main-checkout mutations (control commits, plan-file pre-commits, merges)
+  are serialized through a per-repo mutex so parallel landings never race.
+- Console v1: pause / resume / gc actions (POST API + header buttons), only
+  when actions are explicitly enabled; `crew status` one-liner per project;
+  `crew pause <name>` / `crew resume <name>`.
+- Fixed a scheduler event-loop starvation bug where a settled lane promise
+  turned the main loop into a microtask spin that never yielded to the event
+  loop — child processes were never reaped and every in-flight git call hung.
+
 ## 0.2.0
 
 Phase 2 — The loop, the guards, the review agent, the read-only console.

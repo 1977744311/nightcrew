@@ -35,9 +35,10 @@ import type { Provider, ProviderRunResult } from "../providers/types";
 import type { Reviewer } from "../review/types";
 import { emitEvent } from "../state/events";
 import { appendHistory } from "../state/history";
-import { readState, writeState } from "../state/state";
+import { readState, updateState } from "../state/state";
 import { appendLine, readTextIfExists } from "../utils/fs";
 import { isoNow, newId } from "../utils/id";
+import { namedMutex } from "../utils/mutex";
 import { runShell, tail } from "../utils/process";
 import { runVerify } from "../verify/verify";
 
@@ -49,6 +50,8 @@ export interface RunnerDeps {
 export interface RunOptions {
   operation?: Operation;
   planId?: string;
+  /** Plans already being driven by concurrent runners (parallel scheduling). */
+  excludePlanIds?: string[];
 }
 
 interface StopOverride {
@@ -80,6 +83,68 @@ async function appendQuestion(ctx: ProjectContext, text: string): Promise<void> 
   await commitPaths(ctx.root, [rel], "nightcrew: record open question");
 }
 
+/** Serializes every main-checkout mutation (control commits, merges) per repo. */
+function mainLock(ctx: ProjectContext) {
+  return namedMutex(`main:${ctx.root}`);
+}
+
+/**
+ * Persist one iteration's effects into fresh on-disk state under the state
+ * lock. Concurrent lanes each merge only their own plan-keyed entries, so
+ * streak math and sibling-plan sessions never clobber each other.
+ */
+function persistIteration(
+  ctx: ProjectContext,
+  snapshot: RuntimeState,
+  snapshotBefore: { activePlanId: string | null },
+  record: IterationRecord,
+  stopOverride: StopOverride | null,
+): { reason: StopReason; detail?: string } | null {
+  let stop: { reason: StopReason; detail?: string } | null = null;
+
+  updateState(ctx.paths, (fresh) => {
+    const planId = record.planId;
+    if (planId) {
+      for (const map of ["sessions", "pendingRepairs", "reviewRounds"] as const) {
+        const value = snapshot[map][planId];
+        if (value === undefined) {
+          delete fresh[map][planId];
+        } else {
+          (fresh[map] as Record<string, unknown>)[planId] = value;
+        }
+      }
+    }
+    // activePlanId is the serial cursor; merge it defensively so a parallel
+    // lane completing plan A never clobbers a cursor moved to plan B.
+    if (snapshot.activePlanId !== snapshotBefore.activePlanId) {
+      if (snapshot.activePlanId === null) {
+        if (fresh.activePlanId === record.planId) fresh.activePlanId = null;
+      } else if (
+        fresh.activePlanId === snapshotBefore.activePlanId ||
+        fresh.activePlanId === null
+      ) {
+        fresh.activePlanId = snapshot.activePlanId;
+      }
+    }
+
+    for (const staleId of Object.keys(fresh.pendingRepairs)) {
+      const plan = findPlan(ctx.paths, staleId);
+      if (plan?.status !== "active") delete fresh.pendingRepairs[staleId];
+    }
+
+    if (record.status === "quota") {
+      fresh.resumeAt = quotaResumeAt(ctx.config);
+      record.notes?.push(`quota exhausted; resume scheduled at ${fresh.resumeAt}`);
+    }
+
+    const guard = applyIteration(fresh, record, ctx.config);
+    stop = stopOverride ?? guard.stop;
+    fresh.stop = stop ? { reason: stop.reason, at: isoNow(), detail: stop.detail } : undefined;
+  });
+
+  return stop;
+}
+
 /**
  * Run exactly one iteration. Always returns a record; always leaves runtime
  * state, the history ledger, and the event feed updated — success or failure.
@@ -92,16 +157,21 @@ export async function runIteration(
   const startedAt = isoNow();
   const startMs = Date.now();
   const state = readState(ctx.paths);
-  // Running again is an explicit fresh attempt: previous stop verdicts are stale.
-  state.stop = undefined;
+  const stateBefore = { activePlanId: state.activePlanId };
 
-  // A pending repair whose plan is gone (completed/paused/removed) is stale.
-  if (state.pendingRepair) {
-    const repairPlan = findPlan(ctx.paths, state.pendingRepair.planId);
-    if (repairPlan?.status !== "active") state.pendingRepair = undefined;
+  // Pending repairs whose plans are gone (completed/paused/removed) are stale.
+  for (const planId of Object.keys(state.pendingRepairs)) {
+    const repairPlan = findPlan(ctx.paths, planId);
+    if (repairPlan?.status !== "active") delete state.pendingRepairs[planId];
   }
 
-  const resolved = resolveOperation(state, ctx.paths, ctx.config, options);
+  const resolved = resolveOperation(
+    state,
+    ctx.paths,
+    ctx.config,
+    options,
+    options.excludePlanIds ?? [],
+  );
 
   const record: IterationRecord = {
     id: newId(),
@@ -142,11 +212,14 @@ export async function runIteration(
   try {
     switch (resolved.operation) {
       case "plan":
-        stopOverride = await runControlOp(ctx, deps, state, record, "plan", logEvent);
+      case "garden": {
+        const op = resolved.operation;
+        // Control ops own the main checkout for their whole iteration.
+        stopOverride = await mainLock(ctx).withLock(() =>
+          runControlOp(ctx, deps, state, record, op, logEvent),
+        );
         break;
-      case "garden":
-        stopOverride = await runControlOp(ctx, deps, state, record, "garden", logEvent);
-        break;
+      }
       case "execute":
       case "repair":
         stopOverride = await runCodeOp(ctx, deps, state, record, resolved.plan, logEvent);
@@ -166,21 +239,11 @@ export async function runIteration(
   record.endedAt = isoNow();
   record.durationMs = Date.now() - startMs;
 
-  if (record.status === "quota") {
-    state.resumeAt = quotaResumeAt(ctx.config);
-    record.notes?.push(`quota exhausted; resume scheduled at ${state.resumeAt}`);
-  }
   if (overTokenCap(ctx.config, record.usage)) {
     record.notes?.push("iteration exceeded budget.maxTokensPerIteration");
   }
 
-  const guard = applyIteration(state, record, ctx.config);
-  const stop = stopOverride ?? guard.stop;
-  if (stop) {
-    state.stop = { reason: stop.reason, at: isoNow(), detail: stop.detail };
-  }
-
-  writeState(ctx.paths, state);
+  const stop = persistIteration(ctx, state, stateBefore, record, stopOverride);
   appendHistory(ctx.paths, record);
   emitEvent(ctx.paths, ctx.config.project.name, "iteration.finished", {
     iterationId: record.id,
@@ -406,10 +469,12 @@ async function runCodeOp(
 
   // A manually-dropped plan file must be committed before branching from base.
   const planRel = relative(root, plan.file);
-  const mainDirty = await statusEntries(root);
-  if (mainDirty.some((entry) => entry.path === planRel)) {
-    await commitPaths(root, [planRel], `nightcrew: add plan ${plan.id} (operator)`);
-  }
+  await mainLock(ctx).withLock(async () => {
+    const mainDirty = await statusEntries(root);
+    if (mainDirty.some((entry) => entry.path === planRel)) {
+      await commitPaths(root, [planRel], `nightcrew: add plan ${plan.id} (operator)`);
+    }
+  });
 
   const worktree = await ensureWorktree(paths, plan.id, base);
   if (worktree.created && config.bootstrap.length > 0) {
@@ -421,7 +486,7 @@ async function runCodeOp(
           kind: "bootstrap_failed",
           message: `bootstrap step "${step.name}" failed (exit ${result.exitCode}${result.timedOut ? ", timed out" : ""}): ${tail(result.output, 2_000)}`,
         };
-        state.pendingRepair = {
+        state.pendingRepairs[plan.id] = {
           planId: plan.id,
           reason: "bootstrap_failed",
           message: record.failure.message,
@@ -443,7 +508,7 @@ async function runCodeOp(
     baseBranch: base,
     plan: planInWorktree,
     crew: controlSurface(paths.crewFile),
-    repair: operation === "repair" ? state.pendingRepair : undefined,
+    repair: operation === "repair" ? state.pendingRepairs[plan.id] : undefined,
     protectedPaths: config.protectedPaths,
     writeScope: "code",
   });
@@ -479,7 +544,7 @@ async function runCodeOp(
       kind: failureKindFor(result),
       message: result.errorMessage ?? "provider failed",
     };
-    state.pendingRepair = {
+    state.pendingRepairs[plan.id] = {
       planId: plan.id,
       reason: record.failure.kind,
       message: record.failure.message,
@@ -492,7 +557,7 @@ async function runCodeOp(
       kind: "write_scope_violation",
       message: scope.violations.map((v) => `${v.path} (${v.reason})`).join(", "),
     };
-    state.pendingRepair = {
+    state.pendingRepairs[plan.id] = {
       planId: plan.id,
       reason: "write_scope_violation",
       message: record.failure.message,
@@ -516,7 +581,7 @@ async function runCodeOp(
         kind: "verify_failed",
         message: `verify profile "${verify.profile}" failed`,
       };
-      state.pendingRepair = {
+      state.pendingRepairs[plan.id] = {
         planId: plan.id,
         reason: "verify_failed",
         message: record.failure.message,
@@ -527,7 +592,7 @@ async function runCodeOp(
   }
 
   if (operation === "repair") {
-    state.pendingRepair = undefined;
+    delete state.pendingRepairs[plan.id];
   }
 
   const updatedPlan = readPlan(join(worktree.path, planRel), "active") ?? planInWorktree;
@@ -538,7 +603,10 @@ async function runCodeOp(
     return null;
   }
 
-  return await promotePlan(ctx, deps, state, record, updatedPlan, base, verify);
+  // Landing mutates the main checkout: one lane at a time.
+  return await mainLock(ctx).withLock(() =>
+    promotePlan(ctx, deps, state, record, updatedPlan, base, verify),
+  );
 }
 
 /** Green gates + complete plan → review → land → clean up. */
@@ -580,7 +648,7 @@ async function promotePlan(
     }
     record.status = "failed";
     record.failure = { kind: "review_rejected", message: review.notes };
-    state.pendingRepair = {
+    state.pendingRepairs[plan.id] = {
       planId: plan.id,
       reason: "review_rejected",
       message: "merge review requested changes",
@@ -612,7 +680,7 @@ async function promotePlan(
     delete state.sessions[plan.id];
     delete state.reviewRounds[plan.id];
     if (state.activePlanId === plan.id) state.activePlanId = null;
-    state.pendingRepair = state.pendingRepair?.planId === plan.id ? undefined : state.pendingRepair;
+    delete state.pendingRepairs[plan.id];
   };
 
   if (config.merge.policy === "branch") {
@@ -641,7 +709,7 @@ async function promotePlan(
     case "conflict": {
       record.status = "failed";
       record.failure = { kind: "merge_conflict", message: outcome.detail.slice(0, 2_000) };
-      state.pendingRepair = {
+      state.pendingRepairs[plan.id] = {
         planId: plan.id,
         reason: "merge_conflict",
         message: `branch ${branch} conflicts with ${baseBranch}; merge ${baseBranch} into the worktree and resolve`,
@@ -685,7 +753,7 @@ async function runVerifyOp(
       message: `verify profile "${verify.profile}" failed`,
     };
     if (active) {
-      state.pendingRepair = {
+      state.pendingRepairs[active.id] = {
         planId: active.id,
         reason: "verify_failed",
         message: record.failure.message,
