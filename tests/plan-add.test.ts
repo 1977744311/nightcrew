@@ -7,7 +7,9 @@ import { makeTempProject, type TestProject } from "./helpers";
 
 let project: TestProject | undefined;
 
-async function captureConsole(action: () => Promise<void>): Promise<{ stdout: string; stderr: string }> {
+async function captureConsole(
+  action: () => Promise<void>,
+): Promise<{ stdout: string; stderr: string }> {
   const stdout: string[] = [];
   const stderr: string[] = [];
   const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
@@ -47,18 +49,20 @@ describe("nightcrew plan add", () => {
     const relPath = `.nightcrew/plans/active/${id}.md`;
     const file = join(project.root, relPath);
     const plans = listPlans(project.ctx().paths, "active");
+    const plan = plans[0];
+    if (!plan) throw new Error("expected created plan");
 
     expect(output.stdout).toContain(`created ${relPath}`);
     expect(output.stderr).toBe("");
     expect(plans).toHaveLength(1);
-    expect(plans[0]).toMatchObject({
+    expect(plan).toMatchObject({
       id,
       title: "Ship payments: fast!",
       status: "active",
       parallel: false,
       createdAt: "2026-07-02",
     });
-    expect(validatePlan(plans[0])).toEqual([]);
+    expect(validatePlan(plan)).toEqual([]);
 
     const contents = readFileSync(file, "utf8");
     expect(contents).toContain("## Goal\nShip payments: fast!");

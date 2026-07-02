@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `nightcrew plan add <title>`: create schema-valid active plan scaffolds from
+  the CLI with date-prefixed slug ids, duplicate-id rejection, and printed
+  created paths.
 - `nightcrew doctor`: preflight table for Node, git/repo detection, config
   validity, base branch, bootstrap/verify command strings, registry
   registration, and daemon lock state; exits non-zero when any check fails.
