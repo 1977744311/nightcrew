@@ -9,9 +9,9 @@ parallel: false
 Close the visibility gap in `nightcrew report` by showing how each plan contributed to the nightly summary, so operators can see where iterations and token budget went without losing the existing top-level report shape.
 
 ## Acceptance
-- [ ] `nightcrew report` data includes a per-plan breakdown with iterations, tokens, and landed status while preserving the existing summary fields.
-- [ ] Human-readable report output renders a per-plan table, and `--json` includes the same per-plan data.
-- [ ] Focused tests cover the new report data and rendered output.
+- [x] `nightcrew report` data includes a per-plan breakdown with iterations, tokens, and landed status while preserving the existing summary fields.
+- [x] Human-readable report output renders a per-plan table, and `--json` includes the same per-plan data.
+- [x] Focused tests cover the new report data and rendered output.
 
 ## Steps
 1. Inspect the existing report data model, renderer, and tests to identify the smallest additive shape for per-plan metrics.

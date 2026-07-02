@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `nightcrew report`: add a per-plan breakdown with iterations, token totals,
+  and landed/pending status in both text output and `--json`, while preserving
+  the existing top-level summary.
 - `crew report`: aggregate `nightcrew report` data across every registered
   project with per-project landed/failed/tokens rows, grand totals, `--hours`,
   `--json`, and partial failure reporting for unreadable project reports.
