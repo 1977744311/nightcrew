@@ -1,0 +1,25 @@
+{
+  "name": "nightcrew",
+  "version": "0.0.1",
+  "description": "Your coding agents on the night shift. A loop-engineering control plane for unattended, verify-gated agent iteration across Codex, Claude Code, and Cursor.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1977744311/nightcrew.git"
+  },
+  "homepage": "https://github.com/1977744311/nightcrew#readme",
+  "keywords": [
+    "ai",
+    "agents",
+    "loop-engineering",
+    "automation",
+    "orchestration",
+    "cli",
+    "codex",
+    "claude",
+    "cursor"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
+}
