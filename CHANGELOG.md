@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `crew report`: aggregate `nightcrew report` data across every registered
+  project with per-project landed/failed/tokens rows, grand totals, `--hours`,
+  `--json`, and partial failure reporting for unreadable project reports.
 - `nightcrew plan add <title>`: create schema-valid active plan scaffolds from
   the CLI with date-prefixed slug ids, duplicate-id rejection, and printed
   created paths.
