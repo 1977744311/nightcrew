@@ -1,8 +1,12 @@
 {
   "name": "nightcrew",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Your coding agents on the night shift. A loop-engineering control plane for unattended, verify-gated agent iteration across Codex, Claude Code, and Cursor.",
   "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/1977744311/nightcrew.git"
@@ -19,7 +23,46 @@
     "claude",
     "cursor"
   ],
-  "engines": {
-    "node": ">=22"
+  "bin": {
+    "nightcrew": "dist/cli.js",
+    "crew": "dist/crew.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "^0.142.5",
+    "commander": "^15.0.0",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@changesets/cli": "^2.31.0",
+    "@types/node": "^26.1.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }
