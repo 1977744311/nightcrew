@@ -195,6 +195,11 @@ export interface WorkSpec {
   questions?: string;
   qa?: string;
   repair?: PendingRepair & { verify?: VerifySummary };
+  /** Existing plan index, so control ops never duplicate covered BACKLOG items. */
+  existingPlans?: {
+    active: Array<{ id: string; title: string }>;
+    completed: Array<{ id: string; title: string }>;
+  };
   protectedPaths: string[];
   /** Control ops may only write inside `.nightcrew/`; code ops write product code. */
   writeScope: "control" | "code";

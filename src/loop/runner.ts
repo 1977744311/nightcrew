@@ -272,6 +272,10 @@ async function runControlOp(
   const before = await snapshotDirtyPaths(root);
   const plansBefore = new Set(listPlans(paths, "active").map((plan) => plan.file));
 
+  const summary = (plan: PlanDoc): { id: string; title: string } => ({
+    id: plan.id,
+    title: plan.title,
+  });
   const prompt = renderPrompt({
     operation,
     projectName: config.project.name,
@@ -280,6 +284,10 @@ async function runControlOp(
     crew: controlSurface(paths.crewFile),
     questions: controlSurface(paths.questionsFile),
     qa: controlSurface(paths.qaFile),
+    existingPlans: {
+      active: listPlans(paths, "active").map(summary),
+      completed: listPlans(paths, "completed").map(summary),
+    },
     protectedPaths: config.protectedPaths,
     writeScope: "control",
   });

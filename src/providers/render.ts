@@ -188,11 +188,24 @@ function gardenOpTask(): string[] {
   ];
 }
 
+function planIndex(spec: WorkSpec): string[] {
+  const plans = spec.existingPlans;
+  if (!plans || (plans.active.length === 0 && plans.completed.length === 0)) return [];
+  const lines = ["## Existing plans (BACKLOG items these cover need NO new plan)", ""];
+  for (const plan of plans.active) lines.push(`- active: ${plan.id} — ${plan.title}`);
+  for (const plan of plans.completed) lines.push(`- completed: ${plan.id} — ${plan.title}`);
+  lines.push("");
+  return lines;
+}
+
 export function renderPrompt(spec: WorkSpec): string {
   const lines: string[] = [...header(spec), ...constraints(spec)];
 
   if (spec.operation === "plan" || spec.operation === "garden") {
     lines.push(...section(`${NIGHTCREW_DIR}/crew.md (operator directives + BACKLOG)`, spec.crew));
+    // Plan op only: garden reads plans/ itself, and keeping worktree ids out of
+    // its prompt keeps hygiene passes from fixating on in-flight work.
+    if (spec.operation === "plan") lines.push(...planIndex(spec));
     lines.push(...section(`${NIGHTCREW_DIR}/questions.md`, spec.questions));
     lines.push(...section(`${NIGHTCREW_DIR}/qa.md`, spec.qa));
   }
