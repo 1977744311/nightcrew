@@ -1,0 +1,218 @@
+/**
+ * The console frontend: one dependency-free static page. Fetches the JSON
+ * API, subscribes to SSE, renders with plain DOM. No build step by design —
+ * the console must never be the thing that breaks overnight.
+ */
+export function consoleHtml(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nightcrew console</title>
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #11151f; --panel2: #161b28; --line: #232a3b;
+    --text: #d6dbe7; --dim: #7d8698; --green: #4ade80; --red: #f87171;
+    --yellow: #fbbf24; --blue: #60a5fa; --purple: #c084fc;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  header { padding: 14px 22px; border-bottom: 1px solid var(--line);
+           display: flex; align-items: baseline; gap: 12px; }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: .04em; }
+  header .moon { color: var(--yellow); }
+  header .sub { color: var(--dim); font-size: 12px; }
+  main { padding: 18px 22px; max-width: 1180px; margin: 0 auto; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 14px 16px; cursor: pointer; }
+  .card:hover { border-color: #35405a; }
+  .card h2 { margin: 0 0 6px; font-size: 15px; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11px;
+           border: 1px solid var(--line); color: var(--dim); margin-left: 6px; }
+  .badge.ok { color: var(--green); border-color: #234432; }
+  .badge.bad { color: var(--red); border-color: #4a2530; }
+  .badge.warn { color: var(--yellow); border-color: #4a3d1f; }
+  .kv { color: var(--dim); font-size: 12px; }
+  .kv b { color: var(--text); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+  th { text-align: left; color: var(--dim); font-weight: 500; padding: 4px 8px;
+       border-bottom: 1px solid var(--line); }
+  td { padding: 4px 8px; border-bottom: 1px solid #1a2030; }
+  .st-success { color: var(--green); } .st-failed { color: var(--red); }
+  .st-idle { color: var(--yellow); } .st-quota { color: var(--purple); }
+  section { margin-top: 22px; }
+  section h3 { font-size: 13px; color: var(--dim); text-transform: uppercase;
+               letter-spacing: .08em; margin: 0 0 8px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+  #log { height: 260px; overflow-y: auto; font-size: 12px; }
+  #log div { padding: 1px 0; color: var(--dim); }
+  #log .k-iteration-started, #log .k-iteration-finished { color: var(--text); }
+  #log .k-loop-stopped { color: var(--red); }
+  a.back { color: var(--blue); text-decoration: none; font-size: 12px; }
+  svg { display: block; }
+  .spark path { fill: none; stroke: var(--blue); stroke-width: 1.5; }
+  .spark rect { fill: #1d2434; }
+  .muted { color: var(--dim); }
+  .plans li { margin: 2px 0; }
+  .plans .pid { color: var(--blue); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="moon">☾</span> nightcrew</h1>
+  <span class="sub">your coding agents on the night shift</span>
+  <span class="sub" id="clock"></span>
+</header>
+<main id="app"><div class="muted">loading…</div></main>
+<script>
+var app = document.getElementById("app");
+var es = null;
+
+function h(tag, attrs, children) {
+  var el = document.createElement(tag);
+  attrs = attrs || {};
+  for (var k in attrs) {
+    if (k === "onclick") el.onclick = attrs[k];
+    else if (k === "html") el.innerHTML = attrs[k];
+    else el.setAttribute(k, attrs[k]);
+  }
+  (children || []).forEach(function (c) {
+    el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  });
+  return el;
+}
+
+function fmtTime(iso) { return iso ? iso.slice(5, 16).replace("T", " ") : ""; }
+
+function stateBadges(s) {
+  var out = [];
+  if (!s) return out;
+  if (s.paused) out.push(h("span", { class: "badge warn" }, ["paused"]));
+  if (s.resumeAt) out.push(h("span", { class: "badge warn" }, ["quota → " + fmtTime(s.resumeAt)]));
+  if (s.stop) out.push(h("span", { class: "badge bad" }, ["stopped: " + s.stop.reason]));
+  if (s.pendingRepair) out.push(h("span", { class: "badge warn" }, ["repair: " + s.pendingRepair.reason]));
+  if (out.length === 0) out.push(h("span", { class: "badge ok" }, ["ready"]));
+  return out;
+}
+
+function sparkline(records) {
+  var pts = records.filter(function (r) { return r.usage; }).map(function (r) {
+    return r.usage.inputTokens + r.usage.outputTokens + r.usage.reasoningOutputTokens;
+  });
+  var w = 560, ht = 60;
+  var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", w); svg.setAttribute("height", ht); svg.setAttribute("class", "spark");
+  var bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  bg.setAttribute("width", w); bg.setAttribute("height", ht); bg.setAttribute("rx", 6);
+  svg.appendChild(bg);
+  if (pts.length > 1) {
+    var max = Math.max.apply(null, pts) || 1;
+    var d = pts.map(function (v, i) {
+      var x = 8 + (i * (w - 16)) / (pts.length - 1);
+      var y = ht - 8 - (v / max) * (ht - 16);
+      return (i === 0 ? "M" : "L") + x.toFixed(1) + "," + y.toFixed(1);
+    }).join(" ");
+    var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.appendChild(path);
+  }
+  return svg;
+}
+
+function renderBoard(projects) {
+  if (es) { es.close(); es = null; }
+  var cards = projects.map(function (p) {
+    var last = p.lastIteration;
+    return h("div", { class: "card", onclick: function () { location.hash = "#/p/" + encodeURIComponent(p.name); } }, [
+      h("h2", {}, [p.name].concat(p.ok ? stateBadges(p.state) : [h("span", { class: "badge bad" }, ["error"])])),
+      h("div", { class: "kv" }, p.ok
+        ? ["plans: ", h("b", {}, [String(p.activePlans)]), " active / " + p.completedPlans + " done",
+           last ? "  ·  last: " + last.operation + " " + last.status + " " + fmtTime(last.startedAt) : ""]
+        : [p.error || "unreadable"]),
+    ]);
+  });
+  app.replaceChildren(
+    h("div", { class: "cards" }, cards.length ? cards : [h("div", { class: "muted" }, ["no projects registered — run 'nightcrew init' in a repo"])])
+  );
+}
+
+function renderDetail(d) {
+  if (es) { es.close(); es = null; }
+  var rows = d.history.slice().reverse().slice(0, 40).map(function (r) {
+    return h("tr", {}, [
+      h("td", { class: "muted" }, [fmtTime(r.startedAt)]),
+      h("td", {}, [r.operation]),
+      h("td", { class: "st-" + r.status }, [r.status + (r.failure ? ":" + r.failure.kind : "")]),
+      h("td", { class: "muted" }, [r.planId || ""]),
+      h("td", {}, [String(r.commits.length) + (r.merged ? " ⬆" : "")]),
+      h("td", { class: "muted" }, [r.usage ? String(r.usage.inputTokens + r.usage.outputTokens) : ""]),
+    ]);
+  });
+  var planItems = d.plans.active.map(function (p) {
+    return h("li", {}, [h("span", { class: "pid" }, [p.id]), (p.parallel ? " [parallel] " : " "), p.title]);
+  });
+  var log = h("div", { id: "log" }, []);
+
+  app.replaceChildren(
+    h("div", {}, [
+      h("a", { class: "back", href: "#/" }, ["← all projects"]),
+      h("h2", {}, [d.name].concat(stateBadges(d.state))),
+      h("div", { class: "kv" }, [
+        "streaks: failure=" + d.state.streaks.failure +
+        " noCommit=" + d.state.streaks.noCommit +
+        " controlOnly=" + d.state.streaks.controlOnly +
+        "  ·  tokens total: " + d.budget.totalTokens.toLocaleString() +
+        " over " + d.budget.iterations + " iterations",
+      ]),
+      h("section", {}, [h("h3", {}, ["active plans (" + d.plans.active.length + ")"]),
+        h("div", { class: "panel" }, [d.plans.active.length ? h("ul", { class: "plans" }, planItems) : h("span", { class: "muted" }, ["none"])])]),
+      h("section", {}, [h("h3", {}, ["token curve"]), h("div", { class: "panel" }, [sparkline(d.history)])]),
+      h("section", {}, [h("h3", {}, ["live events"]), h("div", { class: "panel" }, [log])]),
+      h("section", {}, [h("h3", {}, ["iterations"]),
+        h("table", {}, [
+          h("thead", {}, [h("tr", {}, ["time", "op", "status", "plan", "commits", "tokens"].map(function (t) { return h("th", {}, [t]); }))]),
+          h("tbody", {}, rows),
+        ])]),
+    ])
+  );
+
+  es = new EventSource("/api/projects/" + encodeURIComponent(d.name) + "/events");
+  es.onmessage = function (msg) {
+    try {
+      var e = JSON.parse(msg.data);
+      var line = h("div", { class: "k-" + (e.kind || "").replace(/\\./g, "-") },
+        [fmtTime(e.at) + "  " + e.kind + "  " + JSON.stringify(e.data || {})]);
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+    } catch (err) { /* ignore */ }
+  };
+}
+
+function route() {
+  var hash = location.hash || "#/";
+  var match = hash.match(/^#\\/p\\/(.+)$/);
+  if (match) {
+    fetch("/api/projects/" + match[1]).then(function (r) {
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.json();
+    }).then(renderDetail).catch(function (e) {
+      app.replaceChildren(h("div", { class: "muted" }, ["failed to load project: " + e.message]));
+    });
+  } else {
+    fetch("/api/projects").then(function (r) { return r.json(); }).then(renderBoard);
+  }
+}
+
+window.addEventListener("hashchange", route);
+setInterval(function () {
+  document.getElementById("clock").textContent = new Date().toLocaleTimeString();
+  if (!location.hash || location.hash === "#/") route();
+}, 5000);
+route();
+</script>
+</body>
+</html>`;
+}

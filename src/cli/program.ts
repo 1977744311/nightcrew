@@ -4,10 +4,12 @@ import pc from "picocolors";
 import { version } from "../../package.json";
 import { loadProject } from "../config/load";
 import { OPERATIONS, type Operation } from "../core/types";
+import { runLoop } from "../loop/loop";
 import { runIteration } from "../loop/runner";
 import { findPlan, listPlans } from "../plans/plans";
 import { buildProvider } from "../providers/factory";
 import { buildReviewer } from "../review/factory";
+import { updateState } from "../state/state";
 import { initProject } from "./init";
 import { printStatus } from "./status";
 
@@ -44,7 +46,7 @@ export function buildProgram(): Command {
         }
         const ctx = loadProject(rootOf(options));
         const provider = buildProvider(ctx.config, ctx.root);
-        const reviewer = buildReviewer(ctx.config, provider);
+        const reviewer = buildReviewer(ctx.config, provider, ctx.root);
         const record = await runIteration(
           ctx,
           { provider, reviewer },
@@ -72,11 +74,108 @@ export function buildProgram(): Command {
     );
 
   program
+    .command("loop")
+    .description("run iterations until a guard stops the loop")
+    .option("--root <dir>", "project root (default: cwd)")
+    .option("-n, --max-iterations <n>", "iteration budget for this loop run")
+    .action(async (options: { root?: string; maxIterations?: string }) => {
+      const ctx = loadProject(rootOf(options));
+      const provider = buildProvider(ctx.config, ctx.root);
+      const reviewer = buildReviewer(ctx.config, provider, ctx.root);
+      const controller = new AbortController();
+      process.on("SIGINT", () => controller.abort());
+      const result = await runLoop(
+        ctx,
+        { provider, reviewer },
+        {
+          maxIterations: options.maxIterations ? Number(options.maxIterations) : undefined,
+          signal: controller.signal,
+          onRecord: (record) => {
+            const status =
+              record.status === "success"
+                ? pc.green("success")
+                : record.status === "failed"
+                  ? pc.red(`failed:${record.failure?.kind}`)
+                  : pc.yellow(record.status);
+            console.log(
+              `${pc.dim(record.startedAt.slice(11, 19))} ${record.operation.padEnd(7)} ${status}` +
+                `${record.planId ? ` ${pc.dim(record.planId)}` : ""} ` +
+                pc.dim(`${record.commits.length} commits${record.merged ? ", merged" : ""}`),
+            );
+          },
+        },
+      );
+      console.log(
+        `loop finished after ${result.iterations} iterations` +
+          (result.stop
+            ? `: ${pc.bold(result.stop.reason)}${result.stop.detail ? ` — ${result.stop.detail}` : ""}`
+            : ""),
+      );
+    });
+
+  program
+    .command("pause")
+    .description("pause the loop (takes effect before the next iteration)")
+    .option("--root <dir>", "project root (default: cwd)")
+    .option("--reason <text>", "why (shown in status and console)")
+    .action(async (options: { root?: string; reason?: string }) => {
+      const ctx = loadProject(rootOf(options));
+      updateState(ctx.paths, (state) => {
+        state.paused = true;
+        state.pausedReason = options.reason;
+      });
+      console.log("paused");
+    });
+
+  program
+    .command("resume")
+    .description("resume a paused loop and clear stop verdicts")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(async (options: { root?: string }) => {
+      const ctx = loadProject(rootOf(options));
+      updateState(ctx.paths, (state) => {
+        state.paused = false;
+        state.pausedReason = undefined;
+        state.stop = undefined;
+      });
+      console.log("resumed");
+    });
+
+  program
     .command("status")
     .description("project state: plans, streaks, recent iterations")
     .option("--root <dir>", "project root (default: cwd)")
     .action(async (options: { root?: string }) => {
       await printStatus(loadProject(rootOf(options)));
+    });
+
+  program
+    .command("console")
+    .description("serve the local web console (read-only board + live events)")
+    .option("--port <port>", "port", "4711")
+    .option("--host <host>", "bind host", "127.0.0.1")
+    .option("--actions", "enable pause/resume/gc actions from the console")
+    .action(async (options: { port: string; host: string; actions?: boolean }) => {
+      const { createConsoleServer } = await import("../console/server");
+      createConsoleServer({
+        port: Number(options.port),
+        host: options.host,
+        actions: options.actions ?? false,
+      });
+      await new Promise(() => {}); // serve until Ctrl-C
+    });
+
+  program
+    .command("gc")
+    .description("clean stale worktrees, sessions, and old iteration logs")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(async (options: { root?: string }) => {
+      const { gcProject } = await import("./gc");
+      const result = await gcProject(rootOf(options));
+      console.log(
+        `gc: removed ${result.removedWorktrees.length} worktrees, ` +
+          `cleared ${result.clearedSessions.length} stale sessions, pruned ${result.prunedLogs} logs`,
+      );
     });
 
   const plan = program.command("plan").description("inspect plans");

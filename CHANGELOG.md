@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.0
+
+Phase 2 — The loop, the guards, the review agent, the read-only console.
+
+- `nightcrew loop`: durable loop with pause/resume, failure backoff, and
+  automatic operation downgrade to `repair`.
+- Full guard suite under worktree semantics: `max_failure_streak`,
+  `max_no_commit_streak`, `max_control_only_streak` (interleaved plan/garden
+  passes do NOT reset code-op streaks), idle detection, forced garden every N
+  iterations.
+- Budget ledger: per-iteration token usage in `history.jsonl`;
+  `quota_exhausted` is typed scheduling (not failure) with window-aware
+  auto-resume.
+- Review agent ships: independent plan review + merge review on a fresh
+  session and light model tier; `off`/`advisory`/`gate` modes;
+  `request_changes` notes feed the next repair; `max_review_rounds` caps
+  maker↔checker ping-pong, then escalates to the operator; unparseable
+  verdicts retry once, then escalate.
+- Console v0 (read-only): project board, plan list, iteration history, token
+  curve, live SSE event feed. Single dependency-free page served by
+  `nightcrew console`.
+- `nightcrew pause` / `resume` / `gc` commands.
+- Real-SDK smoke test behind `NIGHTCREW_SMOKE=1` (verified against a live
+  Codex subscription); 31 synthetic tests including a 20+-iteration
+  unattended stress night.
+
 ## 0.1.0
 
 Phase 1 — Single-project one-shot vertical slice.

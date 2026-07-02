@@ -6,11 +6,12 @@ import { stringify } from "yaml";
 import { initProject } from "../src/cli/init";
 import { loadProject, type ProjectContext } from "../src/config/load";
 import type { IterationRecord, Operation } from "../src/core/types";
+import { type LoopOptions, type LoopResult, runLoop } from "../src/loop/loop";
 import { runIteration } from "../src/loop/runner";
 import { buildProvider } from "../src/providers/factory";
 import type { FakeScriptEntry } from "../src/providers/fake";
+import { buildReviewer } from "../src/review/factory";
 import type { Reviewer } from "../src/review/types";
-import { NullReviewer } from "../src/review/types";
 import { ensureDir } from "../src/utils/fs";
 
 export function sh(cwd: string, command: string, args: string[]): string {
@@ -34,6 +35,7 @@ export interface TestProject {
     planId?: string;
     reviewer?: Reviewer;
   }) => Promise<IterationRecord>;
+  loop: (options?: LoopOptions) => Promise<LoopResult>;
   ctx: () => ProjectContext;
 }
 
@@ -95,8 +97,14 @@ export async function makeTempProject(
     run: async (options = {}) => {
       const ctx = loadProject(root);
       const provider = buildProvider(ctx.config, ctx.root);
-      const reviewer = options.reviewer ?? new NullReviewer();
+      const reviewer = options.reviewer ?? buildReviewer(ctx.config, provider, ctx.root);
       return await runIteration(ctx, { provider, reviewer }, options);
+    },
+    loop: async (options = {}) => {
+      const ctx = loadProject(root);
+      const provider = buildProvider(ctx.config, ctx.root);
+      const reviewer = buildReviewer(ctx.config, provider, ctx.root);
+      return await runLoop(ctx, { provider, reviewer }, { pollMs: 50, ...options });
     },
     ctx: () => loadProject(root),
   };
