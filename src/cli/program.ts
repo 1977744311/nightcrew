@@ -12,6 +12,7 @@ import { buildProvider } from "../providers/factory";
 import { buildReviewer } from "../review/factory";
 import { acquireProjectLock, lockHolder } from "../state/lock";
 import { updateState } from "../state/state";
+import { renderDoctorReport, runDoctorChecks } from "./doctor";
 import { initProject } from "./init";
 import { printStatus } from "./status";
 
@@ -62,6 +63,16 @@ export function buildProgram(): Command {
     .option("--name <name>", "project name (default: directory name)")
     .action(async (options: { root?: string; name?: string }) => {
       await initProject(rootOf(options), { name: options.name });
+    });
+
+  program
+    .command("doctor")
+    .description("preflight the local runtime, repository, config, registry, and daemon lock")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(async (options: { root?: string }) => {
+      const report = await runDoctorChecks(rootOf(options));
+      console.log(renderDoctorReport(report));
+      process.exitCode = report.ok ? 0 : 1;
     });
 
   program
