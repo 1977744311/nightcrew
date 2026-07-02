@@ -1,4 +1,10 @@
 export {
+  buildCrewReport,
+  type CrewReportData,
+  type CrewReportProject,
+  renderCrewReport,
+} from "./cli/crew-report";
+export {
   type DoctorCheckOptions,
   type DoctorCheckResult,
   type DoctorReport,

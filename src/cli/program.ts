@@ -20,6 +20,14 @@ function rootOf(options: { root?: string }): string {
   return resolve(options.root ?? process.cwd());
 }
 
+function parseHours(value: string): number {
+  const hours = Number(value);
+  if (!Number.isFinite(hours) || hours < 0) {
+    throw new Error(`invalid --hours "${value}"; expected a non-negative number`);
+  }
+  return hours;
+}
+
 function formatRecord(record: IterationRecord): string {
   const status =
     record.status === "success"
@@ -195,7 +203,7 @@ export function buildProgram(): Command {
     .action(async (options: { root?: string; hours: string; json?: boolean }) => {
       const { buildReport, renderReport } = await import("./report");
       const ctx = loadProject(rootOf(options));
-      const report = buildReport(ctx, Number(options.hours) * 3_600_000);
+      const report = buildReport(ctx, parseHours(options.hours) * 3_600_000);
       if (options.json) {
         console.log(JSON.stringify(report, null, 2));
       } else {
@@ -313,6 +321,21 @@ export function buildProgram(): Command {
         }
       },
     );
+
+  crew
+    .command("report")
+    .description("aggregate the morning digest across all registered projects")
+    .option("--hours <n>", "look-back window in hours", "24")
+    .option("--json", "print the report as JSON")
+    .action(async (options: { hours: string; json?: boolean }) => {
+      const { buildCrewReport, renderCrewReport } = await import("./crew-report");
+      const report = buildCrewReport(parseHours(options.hours) * 3_600_000);
+      if (options.json) {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        console.log(renderCrewReport(report));
+      }
+    });
 
   crew
     .command("status")
