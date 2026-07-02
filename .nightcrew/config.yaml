@@ -1,0 +1,54 @@
+version: 1
+
+project:
+  name: nightcrew
+  baseBranch: main
+
+provider:
+  default: codex
+  codex:
+    sandbox: workspace-write
+    networkAccess: false
+    # tiers unset: use the Codex SDK default model for every operation.
+
+# Each plan worktree is a fresh checkout: install deps before the agent works.
+bootstrap:
+  - name: install
+    run: npm ci
+    timeoutMs: 600000
+
+verify:
+  profile: default
+  profiles:
+    default:
+      steps:
+        - name: typecheck
+          run: npm run typecheck
+          timeoutMs: 300000
+        - name: lint
+          run: npx biome check .
+          timeoutMs: 120000
+        - name: test
+          run: npm test
+          timeoutMs: 900000
+
+loop:
+  maxIterations: 20
+  maxFailureStreak: 3
+  maxNoCommitStreak: 3
+  maxControlOnlyStreak: 3
+  gardenEvery: 6
+  iterationTimeoutMs: 2400000
+  idleTimeoutMs: 600000
+
+review:
+  mode: advisory
+  maxReviewRounds: 2
+
+merge:
+  policy: auto
+
+protectedPaths:
+  - .nightcrew/config.yaml
+  - .nightcrew/crew.md
+  - ROADMAP.md
