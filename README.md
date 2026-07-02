@@ -42,6 +42,7 @@ npm install -g nightcrew   # Node >= 22; needs git and a Codex subscription (cod
 
 cd your-repo
 nightcrew init             # scaffolds .nightcrew/ and registers the project
+nightcrew doctor           # first-run sanity check: runtime, repo, config, registry, lock
 $EDITOR .nightcrew/crew.md # write rules + BACKLOG items
 
 nightcrew run              # one supervised iteration, to build trust
@@ -104,15 +105,18 @@ Everything you and the crew say to each other lives in markdown, in your repo:
 | Command | What it does |
 | --- | --- |
 | `nightcrew init` | Scaffold `.nightcrew/`, patch `.gitignore`, register the project |
+| `nightcrew doctor` | Preflight the local runtime, repository, config, registry, and daemon lock |
 | `nightcrew run` | One iteration; `-o/--operation` and `-p/--plan` override resolution |
 | `nightcrew loop` | Iterate until a guard, budget, or the operator stops it |
 | `nightcrew status` | Plans, streaks, worktrees, recent iterations |
 | `nightcrew report` | Morning digest: landed, failed, cost, open questions |
+| `nightcrew plan add <title>` | Create an active plan scaffold |
 | `nightcrew plan list/show` | Inspect plans |
 | `nightcrew pause/resume` | Suspend / wake the loop (also from console and `crew`) |
 | `nightcrew console` | Local web console: board, history, token curve, live events |
 | `nightcrew gc` | Clean stale worktrees, sessions, old logs |
 | `crew start` | Daemon across all registered projects; `--console` serves the UI with actions |
+| `crew report` | Aggregate the morning digest across all registered projects |
 | `crew status` | One line per registered project |
 
 ## Configuration, in 20 lines

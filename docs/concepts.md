@@ -42,6 +42,10 @@ higher rule wins.
 | Human-on-the-loop | `crew.md` BACKLOG in; `questions.md` escalations out; console actions |
 | Observability | `events.jsonl` (SSE to console), `history.jsonl`, `nightcrew report` |
 
+In the morning flow, `nightcrew report` includes a per-plan breakdown of
+iterations, token spend, and landing status so the overnight total has an
+audit trail.
+
 ## The operation model
 
 `operation` is the single run-intent field across config, runtime state,
