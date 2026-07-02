@@ -1,19 +1,27 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
-- `nightcrew report`: add a per-plan breakdown with iterations, token totals,
-  and landed/pending status in both text output and `--json`, while preserving
-  the existing top-level summary.
-- `crew report`: aggregate `nightcrew report` data across every registered
-  project with per-project landed/failed/tokens rows, grand totals, `--hours`,
-  `--json`, and partial failure reporting for unreadable project reports.
-- `nightcrew plan add <title>`: create schema-valid active plan scaffolds from
-  the CLI with date-prefixed slug ids, duplicate-id rejection, and printed
-  created paths.
+The dogfood release: every feature below was planned, implemented, verified,
+reviewed, and landed by nightcrew running unattended on its own repository
+(9 iterations, 4 plans, ~8.9M tokens, zero human-written product code).
+
 - `nightcrew doctor`: preflight table for Node, git/repo detection, config
   validity, base branch, bootstrap/verify command strings, registry
   registration, and daemon lock state; exits non-zero when any check fails.
+- `nightcrew plan add <title>`: create schema-valid active plan scaffolds from
+  the CLI with date-prefixed slug ids, duplicate-id rejection, and printed
+  created paths.
+- `crew report`: aggregate `nightcrew report` data across every registered
+  project with per-project landed/failed/tokens rows, grand totals, `--hours`,
+  `--json`, and partial failure reporting for unreadable project reports.
+- `nightcrew report`: add a per-plan breakdown with iterations, token totals,
+  and landed/pending status in both text output and `--json`, while preserving
+  the existing top-level summary.
+- Plan op now receives an index of active and completed plans, so a multi-item
+  BACKLOG is consumed item by item instead of replanning covered work.
+- Garden no longer edits `crew.md` (it is operator-owned and protected by
+  default); it reports done-looking BACKLOG items in its final message instead.
 
 ## 1.0.0
 
