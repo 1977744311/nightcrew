@@ -11,7 +11,7 @@ export {
   renderDoctorReport,
   runDoctorChecks,
 } from "./cli/doctor";
-export { buildReport, type ReportData, renderReport } from "./cli/report";
+export { buildReport, type ReportData, type ReportPlanBreakdown, renderReport } from "./cli/report";
 export { ConfigError, loadConfig, loadProject, type ProjectContext } from "./config/load";
 export { readRegistry, registerProject, registryFile } from "./config/registry";
 export {

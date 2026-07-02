@@ -18,6 +18,7 @@ export interface ReportData {
     idle: number;
     quota: number;
   };
+  plans: ReportPlanBreakdown[];
   landed: Array<{ planId: string; title: string; commits: number }>;
   commits: number;
   usage: TokenUsage | null;
@@ -32,6 +33,15 @@ export interface ReportData {
     resumeAt?: string;
     pendingRepairs: string[];
   };
+}
+
+export interface ReportPlanBreakdown {
+  planId: string;
+  title: string;
+  iterations: number;
+  usage: TokenUsage | null;
+  totalTokens: number;
+  landed: boolean;
 }
 
 /** Unchecked `- [ ]` items from questions.md — decisions awaiting the operator. */
@@ -50,6 +60,32 @@ function completedPlanTitle(ctx: ProjectContext, planId: string): string {
     if (match) return match.title;
   }
   return planId;
+}
+
+function planBreakdown(ctx: ProjectContext, history: IterationRecord[]): ReportPlanBreakdown[] {
+  const plans = new Map<string, Omit<ReportPlanBreakdown, "totalTokens">>();
+
+  for (const record of history) {
+    if (!record.planId) continue;
+    const existing =
+      plans.get(record.planId) ??
+      ({
+        planId: record.planId,
+        title: completedPlanTitle(ctx, record.planId),
+        iterations: 0,
+        usage: null,
+        landed: false,
+      } satisfies Omit<ReportPlanBreakdown, "totalTokens">);
+    existing.iterations += 1;
+    existing.usage = addUsage(existing.usage, record.usage);
+    existing.landed = existing.landed || record.merged;
+    plans.set(record.planId, existing);
+  }
+
+  return [...plans.values()].map((plan) => ({
+    ...plan,
+    totalTokens: totalTokens(plan.usage),
+  }));
 }
 
 /** Everything the morning digest needs, as data (the CLI renders it, tests assert it). */
@@ -102,6 +138,7 @@ export function buildReport(ctx: ProjectContext, sinceMs: number): ReportData {
     since: since.toISOString(),
     until: new Date(now).toISOString(),
     iterations,
+    plans: planBreakdown(ctx, history),
     landed,
     commits: history.reduce((sum, record) => sum + record.commits.length, 0),
     usage,
@@ -143,6 +180,21 @@ export function renderReport(report: ReportData): string {
   lines.push(
     `  commits     ${pc.bold(String(report.commits))}    tokens  ${pc.bold(report.totalTokens.toLocaleString())}`,
   );
+
+  lines.push("");
+  lines.push(pc.bold("  plans"));
+  if (report.plans.length === 0) {
+    lines.push(pc.dim("    no plan-scoped iterations in this window"));
+  } else {
+    lines.push(pc.dim("    iter      tokens  status   plan"));
+    for (const plan of report.plans) {
+      const iterations = pc.bold(String(plan.iterations).padStart(4));
+      const tokens = pc.bold(plan.totalTokens.toLocaleString().padStart(10));
+      const statusText = plan.landed ? "landed" : "pending";
+      const status = plan.landed ? pc.green(statusText.padEnd(7)) : pc.dim(statusText.padEnd(7));
+      lines.push(`    ${iterations}  ${tokens}  ${status}  ${plan.planId}  ${plan.title}`);
+    }
+  }
 
   lines.push("");
   lines.push(pc.bold("  landed"));
