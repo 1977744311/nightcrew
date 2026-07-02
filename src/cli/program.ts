@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { Command } from "commander";
 import pc from "picocolors";
 import { version } from "../../package.json";
@@ -7,7 +7,7 @@ import { readRegistry } from "../config/registry";
 import { type IterationRecord, OPERATIONS, type Operation } from "../core/types";
 import { runLoop } from "../loop/loop";
 import { runIteration } from "../loop/runner";
-import { findPlan, listPlans } from "../plans/plans";
+import { createActivePlan, findPlan, listPlans } from "../plans/plans";
 import { buildProvider } from "../providers/factory";
 import { buildReviewer } from "../review/factory";
 import { acquireProjectLock, lockHolder } from "../state/lock";
@@ -233,6 +233,16 @@ export function buildProgram(): Command {
     });
 
   const plan = program.command("plan").description("inspect plans");
+  plan
+    .command("add <title...>")
+    .description("create an active plan scaffold")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(async (titleParts: string[], options: { root?: string }) => {
+      const ctx = loadProject(rootOf(options));
+      const doc = createActivePlan(ctx.paths, titleParts.join(" "));
+      const path = relative(ctx.root, doc.file).replaceAll("\\", "/");
+      console.log(`${pc.green("created")} ${path}`);
+    });
   plan
     .command("list")
     .description("list plans by status")

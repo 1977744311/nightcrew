@@ -1,9 +1,10 @@
-import { existsSync, readdirSync, renameSync } from "node:fs";
+import { existsSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { parse } from "yaml";
+import { parse, stringify } from "yaml";
 import type { ProjectPaths } from "../core/paths";
 import type { PlanDoc, PlanStatus } from "../core/types";
 import { ensureDir, readTextIfExists } from "../utils/fs";
+import { dateStamp, slugify } from "../utils/id";
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
@@ -85,6 +86,69 @@ export function findPlan(paths: ProjectPaths, planId: string): PlanDoc | null {
     if (match) return match;
   }
   return null;
+}
+
+export function planIdForTitle(title: string, date = new Date()): string {
+  const slug = slugify(title.trim());
+  if (!slug) throw new Error("plan title must contain at least one ASCII letter or number");
+  return `${dateStamp(date)}-${slug}`;
+}
+
+export function renderPlanScaffold(id: string, title: string): string {
+  const cleanTitle = title.trim();
+  const frontmatter = stringify({
+    id,
+    title: cleanTitle,
+    created: id.slice(0, 10),
+    parallel: false,
+  }).trim();
+
+  return [
+    "---",
+    frontmatter,
+    "---",
+    "",
+    "## Goal",
+    cleanTitle,
+    "",
+    "## Acceptance",
+    "- [ ] Define the acceptance criteria.",
+    "",
+    "## Steps",
+    "1. Define the implementation steps.",
+    "",
+  ].join("\n");
+}
+
+export function createActivePlan(
+  paths: ProjectPaths,
+  title: string,
+  options: { date?: Date } = {},
+): PlanDoc {
+  const cleanTitle = title.trim();
+  if (!cleanTitle) throw new Error("plan title is required");
+
+  const id = planIdForTitle(cleanTitle, options.date);
+  const existing = findPlan(paths, id);
+  if (existing) {
+    throw new Error(`plan "${id}" already exists at ${existing.file}`);
+  }
+
+  const file = join(paths.activePlansDir, `${id}.md`);
+  const contents = renderPlanScaffold(id, cleanTitle);
+  ensureDir(paths.activePlansDir);
+  try {
+    writeFileSync(file, contents, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      throw new Error(`plan "${id}" already exists at ${file}`);
+    }
+    throw error;
+  }
+
+  const plan = readPlan(file, "active");
+  if (!plan) throw new Error(`created plan "${id}" could not be read at ${file}`);
+  return plan;
 }
 
 /**
