@@ -1,6 +1,6 @@
 import type { ProjectContext } from "../config/load";
 import { resolveOperation } from "../core/operations";
-import type { IterationRecord, StopReason } from "../core/types";
+import type { IterationRecord } from "../core/types";
 import { type RunnerDeps, runIteration } from "../loop/runner";
 import { findPlan } from "../plans/plans";
 import { emitEvent } from "../state/events";
@@ -117,7 +117,7 @@ export async function runProjectScheduler(
         continue;
       }
       const plan = findPlan(paths, planId);
-      if (!plan || plan.status !== "active") return;
+      if (plan?.status !== "active") return;
       const record = await runOne(planId);
       if (record.merged || record.status === "idle") return;
       const state = readState(paths);

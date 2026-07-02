@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0
+
+Phase 4 — Operator experience; API freeze.
+
+- `nightcrew report`: the morning digest — iterations by outcome, plans
+  landed (with titles and commit counts), token totals, failure breakdown,
+  review escalations, open questions from `questions.md`, the active queue,
+  and anything needing attention (paused / stopped / quota / pending
+  repairs). `--hours` window, `--json` for machines.
+- Docs for 1.0: README rewritten around the 90-second pitch; `docs/concepts.md`
+  (design constitution, loop-engineering vocabulary map, operation model,
+  promotion pipeline, guards); `docs/configuration.md` (full annotated config
+  reference mirroring the zod schema); CONTRIBUTING; issue templates.
+- Library surface completed and frozen: scheduler (`runProjectScheduler`,
+  `runCrewDaemon`, `inWindow`), locks, and report join the exports.
+- **API freeze under semver**: the `operation` model (plan / execute /
+  verify / repair / garden), config schema, CLI surface, control-file
+  layout (`.nightcrew/`), and library exports are stable from this release.
+  Codex-only at 1.0 is a feature, not a gap: one deeply polished executor
+  behind a provider interface built for more.
+
 ## 0.3.0
 
 Phase 3 — The crew: multi-project daemon, parallel plans, schedule windows.
@@ -8,13 +29,13 @@ Phase 3 — The crew: multi-project daemon, parallel plans, schedule windows.
   scheduler per project; `--projects` filters, `--now` ignores windows,
   `--console` serves the web console with actions enabled.
 - Parallel plans: plans marked `parallel: true` run in concurrent worktree
-  lanes (bounded by `loop.max_parallel_plans`); serial plans queue; control
+  lanes (bounded by `loop.maxParallelPlans`); serial plans queue; control
   ops (plan/garden) require exclusive occupancy. Per-plan repair state
   (`pendingRepairs` map) and defensive state merging keep concurrent lanes
   from clobbering each other's sessions, repairs, or the serial cursor.
 - Schedule windows: `schedule.windows` (`"23:00-07:00"` wraps midnight and
   belongs to its start day) and `schedule.days`; outside the window the
-  scheduler waits instead of running; `schedule.idle_cooldown_ms` naps after
+  scheduler waits instead of running; `schedule.idleCooldownMs` naps after
   an idle stop before re-consulting the BACKLOG.
 - Cross-process project lock (`runtime/daemon.lock`, stale-pid reclaim) plus
   in-process holder registry: `run`, `loop`, and the daemon refuse to
@@ -34,8 +55,8 @@ Phase 2 — The loop, the guards, the review agent, the read-only console.
 
 - `nightcrew loop`: durable loop with pause/resume, failure backoff, and
   automatic operation downgrade to `repair`.
-- Full guard suite under worktree semantics: `max_failure_streak`,
-  `max_no_commit_streak`, `max_control_only_streak` (interleaved plan/garden
+- Full guard suite under worktree semantics: `loop.maxFailureStreak`,
+  `loop.maxNoCommitStreak`, `loop.maxControlOnlyStreak` (interleaved plan/garden
   passes do NOT reset code-op streaks), idle detection, forced garden every N
   iterations.
 - Budget ledger: per-iteration token usage in `history.jsonl`;
@@ -43,7 +64,7 @@ Phase 2 — The loop, the guards, the review agent, the read-only console.
   auto-resume.
 - Review agent ships: independent plan review + merge review on a fresh
   session and light model tier; `off`/`advisory`/`gate` modes;
-  `request_changes` notes feed the next repair; `max_review_rounds` caps
+  `request_changes` notes feed the next repair; `review.maxReviewRounds` caps
   maker↔checker ping-pong, then escalates to the operator; unparseable
   verdicts retry once, then escalate.
 - Console v0 (read-only): project board, plan list, iteration history, token

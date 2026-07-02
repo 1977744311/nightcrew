@@ -1,3 +1,4 @@
+export { buildReport, type ReportData, renderReport } from "./cli/report";
 export { ConfigError, loadConfig, loadProject, type ProjectContext } from "./config/load";
 export { readRegistry, registerProject, registryFile } from "./config/registry";
 export {
@@ -25,6 +26,14 @@ export type {
 export { AgentReviewer, parseVerdict } from "./review/agent";
 export { buildReviewer } from "./review/factory";
 export { NullReviewer, type Reviewer } from "./review/types";
+export { type DaemonOptions, type DaemonResult, runCrewDaemon } from "./scheduler/daemon";
+export {
+  runProjectScheduler,
+  type SchedulerOptions,
+  type SchedulerResult,
+} from "./scheduler/scheduler";
+export { inWindow } from "./scheduler/windows";
 export { readHistory } from "./state/history";
+export { acquireProjectLock, lockHolder } from "./state/lock";
 export { readState } from "./state/state";
 export { runVerify } from "./verify/verify";

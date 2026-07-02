@@ -176,6 +176,23 @@ export function buildProgram(): Command {
     });
 
   program
+    .command("report")
+    .description("the morning digest: what landed overnight, what needs you")
+    .option("--root <dir>", "project root (default: cwd)")
+    .option("--hours <n>", "look-back window in hours", "24")
+    .option("--json", "print the report as JSON")
+    .action(async (options: { root?: string; hours: string; json?: boolean }) => {
+      const { buildReport, renderReport } = await import("./report");
+      const ctx = loadProject(rootOf(options));
+      const report = buildReport(ctx, Number(options.hours) * 3_600_000);
+      if (options.json) {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        console.log(renderReport(report));
+      }
+    });
+
+  program
     .command("console")
     .description("serve the local web console (read-only board + live events)")
     .option("--port <port>", "port", "4711")
