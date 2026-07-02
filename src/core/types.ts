@@ -141,6 +141,7 @@ export interface PendingRepair {
   reason: FailureKind;
   message: string;
   reviewNotes?: string;
+  verify?: VerifySummary;
 }
 
 /** Durable runtime state (runtime/state.json). Disposable, never committed. */

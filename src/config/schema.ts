@@ -43,14 +43,16 @@ export const configSchema = z.strictObject({
           sandbox: z
             .enum(["read-only", "workspace-write", "danger-full-access"])
             .default("workspace-write"),
+          /** Whether the agent itself may reach the network (bootstrap steps always can). */
+          networkAccess: z.boolean().default(false),
         })
-        .default({ tiers: {}, sandbox: "workspace-write" }),
+        .default({ tiers: {}, sandbox: "workspace-write", networkAccess: false }),
       /** Test-only adapter. `script` points to a JSON script file. */
       fake: z.strictObject({ script: z.string().min(1) }).optional(),
     })
     .default({
       default: "codex",
-      codex: { tiers: {}, sandbox: "workspace-write" },
+      codex: { tiers: {}, sandbox: "workspace-write", networkAccess: false },
     }),
   routing: z
     .strictObject({
