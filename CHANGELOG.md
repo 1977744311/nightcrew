@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `nightcrew doctor`: preflight table for Node, git/repo detection, config
+  validity, base branch, bootstrap/verify command strings, registry
+  registration, and daemon lock state; exits non-zero when any check fails.
+
 ## 1.0.0
 
 Phase 4 — Operator experience; API freeze.
