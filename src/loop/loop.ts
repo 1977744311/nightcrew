@@ -1,6 +1,7 @@
 import type { ProjectContext } from "../config/load";
 import type { IterationRecord, StopReason } from "../core/types";
 import { notifyWebhook } from "../notify/webhook";
+import { assertProviderPreflight } from "../providers/preflight";
 import { emitEvent } from "../state/events";
 import { readState, updateState } from "../state/state";
 import { isoNow } from "../utils/id";
@@ -46,6 +47,7 @@ export async function runLoop(
   options: LoopOptions = {},
 ): Promise<LoopResult> {
   const { config, paths } = ctx;
+  assertProviderPreflight(config);
   const maxIterations = options.maxIterations ?? config.loop.maxIterations;
   const pollMs = options.pollMs ?? 2_000;
   let iterations = 0;

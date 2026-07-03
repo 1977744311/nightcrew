@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { runCli } from "../src/cli/program";
 import { registerProject } from "../src/config/registry";
 import type { IterationRecord } from "../src/core/types";
 import { listPlans } from "../src/plans/plans";
@@ -19,7 +20,30 @@ const extraProjects: TestProject[] = [];
 afterEach(() => {
   project?.cleanup();
   for (const extra of extraProjects.splice(0)) extra.cleanup();
+  vi.restoreAllMocks();
+  process.exitCode = undefined;
 });
+
+async function captureConsole(action: () => Promise<void>): Promise<string> {
+  const lines: string[] = [];
+  const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    lines.push(args.join(" "));
+  });
+  const warnSpy = vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+    lines.push(args.join(" "));
+  });
+  const errorSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+    lines.push(args.join(" "));
+  });
+  try {
+    await action();
+  } finally {
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
+  }
+  return lines.join("\n");
+}
 
 describe("schedule windows", () => {
   const at = (day: number, hh: number, mm: number): Date => {
@@ -163,6 +187,31 @@ describe("project scheduler", () => {
 });
 
 describe("crew daemon", () => {
+  it("fails a Codex project before starting work when auth is missing", async () => {
+    project = await makeTempProject();
+    project.setConfig({ provider: { default: "codex" } });
+    project.setScript([{ match: "operation = \\*\\*plan\\*\\*", finalMessage: "IDLE" }]);
+    const previousCodexHome = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = join(project.home, "missing-codex");
+
+    try {
+      const output = await captureConsole(() =>
+        runCli(["crew", "start", "--projects", "demo", "--now", "--poll", "50"]),
+      );
+
+      expect(process.exitCode).toBe(1);
+      expect(output).toContain("codex login");
+      expect(output).toContain("0 iterations");
+      expect(readHistory(project.ctx().paths)).toHaveLength(0);
+    } finally {
+      if (previousCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = previousCodexHome;
+      }
+    }
+  });
+
   it("drives every registered project concurrently", async () => {
     // Two projects; the second one's NIGHTCREW_HOME is the daemon's registry,
     // so register the first project there too (distinct name).

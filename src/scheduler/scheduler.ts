@@ -4,6 +4,7 @@ import type { IterationRecord } from "../core/types";
 import { type RunnerDeps, runIteration } from "../loop/runner";
 import { maybeTriageQa } from "../loop/triage";
 import { findPlan } from "../plans/plans";
+import { assertProviderPreflight } from "../providers/preflight";
 import { emitEvent } from "../state/events";
 import { acquireProjectLock } from "../state/lock";
 import { readState, updateState } from "../state/state";
@@ -52,6 +53,7 @@ export async function runProjectScheduler(
   options: SchedulerOptions = {},
 ): Promise<SchedulerResult> {
   const { config, paths } = ctx;
+  assertProviderPreflight(config);
   const name = config.project.name;
   const pollMs = options.pollMs ?? 15_000;
   let iterations = 0;

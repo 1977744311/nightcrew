@@ -29,6 +29,27 @@ function planEntry(id: string, title: string) {
 }
 
 describe("loop guards", () => {
+  it("fails fast before running when Codex auth is missing", async () => {
+    project = await makeTempProject(FAST_LOOP);
+    project.setConfig({ provider: { default: "codex" } });
+    project.setScript([{ match: "operation = \\*\\*plan\\*\\*", finalMessage: "IDLE" }]);
+    const previousCodexHome = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = join(project.home, "missing-codex");
+
+    try {
+      await expect(project.loop({ maxIterations: 1 })).rejects.toMatchObject({
+        code: "provider_preflight_failed",
+      });
+    } finally {
+      if (previousCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = previousCodexHome;
+      }
+    }
+    expect(readHistory(project.ctx().paths)).toHaveLength(0);
+  });
+
   it("stops on max_failure_streak with backoff-driven downgrades to repair", async () => {
     project = await makeTempProject(FAST_LOOP);
     project.setCrew(["Doomed work"]);
