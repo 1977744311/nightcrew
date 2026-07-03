@@ -18,6 +18,9 @@ project:
 #   codex:
 #     sandbox: workspace-write
 #     networkAccess: false
+#     webSearch: cached       # disabled | cached | live
+#     webSearchOverrides:
+#       propose: live
 #     tiers:
 #       light: gpt-5.1-codex-mini   # plan / garden / review
 #       heavy: gpt-5.1-codex        # execute / repair

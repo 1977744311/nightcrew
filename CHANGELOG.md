@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added Codex web-search controls: `provider.codex.webSearch` defaults to
+  `cached`, `provider.codex.webSearchOverrides` can override operations such as
+  `propose`, and the Codex adapter passes the resolved mode to SDK
+  `ThreadOptions.webSearchMode`; proposal research prompts now ask
+  external-ecosystem goals to search first and cite sources in rationales.
 - Added `nightcrew propose refine [<id-or-file>] --feedback <text>` plus TTY
   zero-selection feedback refinement, preserving source lineage and archiving
   superseded proposal artifacts.

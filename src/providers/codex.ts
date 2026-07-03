@@ -1,4 +1,5 @@
 import { Codex, type ThreadEvent, type ThreadOptions } from "@openai/codex-sdk";
+import type { CodexWebSearchMode } from "../config/schema";
 import type { TokenUsage } from "../core/types";
 import {
   looksLikeQuotaError,
@@ -12,6 +13,7 @@ import {
 export interface CodexAdapterOptions {
   sandbox: "read-only" | "workspace-write" | "danger-full-access";
   networkAccess: boolean;
+  webSearchMode?: CodexWebSearchMode;
 }
 
 function mapUsage(usage: {
@@ -95,6 +97,7 @@ export class CodexProvider implements Provider {
       skipGitRepoCheck: true,
       approvalPolicy: "never",
       networkAccessEnabled: this.options.networkAccess,
+      webSearchMode: options.webSearchMode ?? this.options.webSearchMode ?? "cached",
     };
 
     const thread = options.sessionId

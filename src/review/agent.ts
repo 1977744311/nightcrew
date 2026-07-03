@@ -1,6 +1,6 @@
 import type { NightcrewConfig } from "../config/schema";
 import { REVIEW_VERDICTS, type ReviewRecord, type ReviewVerdict } from "../core/types";
-import { reviewModel } from "../providers/factory";
+import { reviewModel, webSearchModeFor } from "../providers/factory";
 import type { Provider } from "../providers/types";
 import type { MergeReviewInput, PlanReviewInput, Reviewer } from "./types";
 
@@ -157,6 +157,7 @@ export class AgentReviewer implements Reviewer {
         prompt,
         workingDirectory: this.projectRoot,
         model: reviewModel(this.config),
+        webSearchMode: webSearchModeFor(this.config, "review"),
         sessionId: null,
         timeoutMs: Math.min(this.config.loop.iterationTimeoutMs, 900_000),
         idleTimeoutMs: this.config.loop.idleTimeoutMs,

@@ -1,3 +1,4 @@
+import type { CodexWebSearchMode } from "../config/schema";
 import type { TokenUsage } from "../core/types";
 
 /**
@@ -33,6 +34,8 @@ export interface ProviderRunOptions {
   /** Abort when no provider events arrive for this long (buffered-output trap). */
   idleTimeoutMs: number;
   readOnly?: boolean;
+  /** Codex web-search behavior for this provider run. Non-Codex adapters may ignore it. */
+  webSearchMode?: CodexWebSearchMode;
   /** JSON schema for structured output (used by review). */
   outputSchema?: unknown;
   onEvent?: (event: ProviderEvent) => void;

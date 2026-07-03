@@ -20,6 +20,17 @@ export const verifyProfileSchema = z.strictObject({
 export type VerifyProfile = z.infer<typeof verifyProfileSchema>;
 
 const tierSchema = z.enum(["light", "heavy"]);
+const webSearchModeSchema = z.enum(["disabled", "cached", "live"]);
+const codexWebSearchOverridesSchema = z
+  .strictObject({
+    plan: webSearchModeSchema.optional(),
+    execute: webSearchModeSchema.optional(),
+    repair: webSearchModeSchema.optional(),
+    garden: webSearchModeSchema.optional(),
+    review: webSearchModeSchema.optional(),
+    propose: webSearchModeSchema.optional(),
+  })
+  .default({});
 
 export const configSchema = z.strictObject({
   version: z.literal(1).default(1),
@@ -45,14 +56,30 @@ export const configSchema = z.strictObject({
             .default("workspace-write"),
           /** Whether the agent itself may reach the network (bootstrap steps always can). */
           networkAccess: z.boolean().default(false),
+          /** Codex SDK web-search behavior. */
+          webSearch: webSearchModeSchema.default("cached"),
+          /** Per-provider-operation web-search overrides. */
+          webSearchOverrides: codexWebSearchOverridesSchema,
         })
-        .default({ tiers: {}, sandbox: "workspace-write", networkAccess: false }),
+        .default({
+          tiers: {},
+          sandbox: "workspace-write",
+          networkAccess: false,
+          webSearch: "cached",
+          webSearchOverrides: {},
+        }),
       /** Test-only adapter. `script` points to a JSON script file. */
       fake: z.strictObject({ script: z.string().min(1) }).optional(),
     })
     .default({
       default: "codex",
-      codex: { tiers: {}, sandbox: "workspace-write", networkAccess: false },
+      codex: {
+        tiers: {},
+        sandbox: "workspace-write",
+        networkAccess: false,
+        webSearch: "cached",
+        webSearchOverrides: {},
+      },
     }),
   routing: z
     .strictObject({
@@ -144,3 +171,4 @@ export const configSchema = z.strictObject({
 
 export type NightcrewConfig = z.infer<typeof configSchema>;
 export type NightcrewConfigInput = z.input<typeof configSchema>;
+export type CodexWebSearchMode = z.infer<typeof webSearchModeSchema>;
