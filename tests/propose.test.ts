@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/program";
+import { renderProposalItemPreview } from "../src/cli/proposal-selection";
 import { reviewProposal, runPropose } from "../src/cli/propose";
 import { createProposalProgressReporter } from "../src/cli/propose-progress";
 import { generateProposal, type ProposalProgressEvent } from "../src/proposals/generate";
@@ -174,6 +175,24 @@ afterEach(() => {
 });
 
 describe("nightcrew propose", () => {
+  it("renders proposal preview text with title, source lens, rationale, and full body", () => {
+    const item = {
+      id: "2",
+      lens: "architecture_first" as const,
+      ...candidate("Preview candidate", "preview"),
+    };
+
+    expect(renderProposalItemPreview(item)).toBe(
+      [
+        "2. Preview candidate",
+        "source lens: architecture_first",
+        "rationale: preview rationale",
+        "",
+        candidate("Preview candidate", "preview").body,
+      ].join("\n"),
+    );
+  });
+
   it("generates one stable artifact from three structured read-only fake-provider passes", async () => {
     project = await makeTempProject();
     project.setConfig({
@@ -419,12 +438,12 @@ describe("nightcrew propose", () => {
     const crew = readFileSync(project.ctx().paths.crewFile, "utf8");
     expect(output.stderr).toBe("");
     expect(output.stdout).toContain(`created ${relPath}`);
-    expect(stdoutBeforePrompt).toContain("1. Minimal candidate");
-    expect(stdoutBeforePrompt).toContain("source lens: minimal_path");
-    expect(stdoutBeforePrompt).toContain(candidate("Minimal candidate", "minimal").body);
-    expect(stdoutBeforePrompt).toContain("3. Risk candidate");
-    expect(stdoutBeforePrompt).toContain("source lens: risk_first");
-    expect(stdoutBeforePrompt).toContain(candidate("Risk candidate", "risk").body);
+    expect(stdoutBeforePrompt).not.toContain("1. Minimal candidate");
+    expect(stdoutBeforePrompt).not.toContain("source lens: minimal_path");
+    expect(stdoutBeforePrompt).not.toContain(candidate("Minimal candidate", "minimal").body);
+    expect(stdoutBeforePrompt).not.toContain("3. Risk candidate");
+    expect(stdoutBeforePrompt).not.toContain("source lens: risk_first");
+    expect(stdoutBeforePrompt).not.toContain(candidate("Risk candidate", "risk").body);
     expect(output.stdout).toContain("selected 1 item");
     expect(output.stdout).toContain("archived .nightcrew/proposals/archive/");
     expect(crew).toContain(candidate("Architecture candidate", "architecture").body);
@@ -697,9 +716,9 @@ describe("nightcrew propose", () => {
     const archived = join(project.ctx().paths.archivedProposalsDir, `${proposal.id}.json`);
     expect(output.stderr).toBe("");
     expect(output.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
-    expect(stdoutBeforePrompt).toContain("1. Deferred item");
-    expect(stdoutBeforePrompt).toContain("source lens: minimal_path");
-    expect(stdoutBeforePrompt).toContain(candidate("Deferred item", "deferred").body);
+    expect(stdoutBeforePrompt).not.toContain("1. Deferred item");
+    expect(stdoutBeforePrompt).not.toContain("source lens: minimal_path");
+    expect(stdoutBeforePrompt).not.toContain(candidate("Deferred item", "deferred").body);
     expect(output.stdout).toContain("no items selected; proposal left pending");
     expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
     expect(existsSync(file)).toBe(true);
