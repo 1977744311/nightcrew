@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added release automation with the official changesets action, npm provenance
+  publishing through `npm publish --provenance`, `publishConfig.provenance`,
+  and contributor documentation for the `NPM_TOKEN` setup and manual fallback.
 - Added a generated JSON Schema for `.nightcrew/config.yaml`, an `npm run schema`
   sync path, and a `nightcrew init` YAML language-server comment pointing
   editors at the committed schema.
