@@ -43,6 +43,14 @@ export function printProposalItems(proposal: ProposalArtifact): void {
   }
 }
 
+export function printProposalPromptDetails(proposal: ProposalArtifact): void {
+  for (const item of proposal.items) {
+    console.log(`${pc.bold(item.id)}. ${item.title}`);
+    console.log(pc.dim(`source lens: ${item.lens}`));
+    console.log(item.body);
+  }
+}
+
 export function printProposalSelectHint(
   proposal: ProposalArtifact,
   options: { includeProposal?: boolean } = {},
@@ -90,6 +98,7 @@ export async function reviewProposalSelection(
     return { mode: "non-tty", selectedItems: [] };
   }
 
+  printProposalPromptDetails(artifact.proposal);
   const picked = await (options.prompt ?? promptProposalIds)(artifact.proposal);
   if (isCancel(picked) || picked.length === 0) {
     console.log(pc.dim("no items selected; proposal left pending"));

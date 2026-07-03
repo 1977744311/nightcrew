@@ -9,9 +9,9 @@ parallel: false
 Close the approval-visibility gap in the proposal TTY flow by printing every candidate's id, title, source lens, and full backlog body before the checkbox picker opens, so an operator can review the exact text that would be appended without changing the existing non-TTY behavior.
 
 ## Acceptance
-- [ ] TTY proposal generation and `nightcrew propose review` both render the full candidate details before invoking the checkbox picker.
-- [ ] Picker option labels remain short while the non-TTY proposal output remains unchanged.
-- [ ] Tests cover the pre-picker printing through the injectable prompt seam and confirm existing selection behavior still routes through the same approval path.
+- [x] TTY proposal generation and `nightcrew propose review` both render the full candidate details before invoking the checkbox picker.
+- [x] Picker option labels remain short while the non-TTY proposal output remains unchanged.
+- [x] Tests cover the pre-picker printing through the injectable prompt seam and confirm existing selection behavior still routes through the same approval path.
 
 ## Steps
 1. Locate the shared TTY review/picker path used after proposal generation and by `propose review`.

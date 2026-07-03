@@ -18,10 +18,14 @@ function requireProject(): TestProject {
 }
 
 async function captureConsole(
-  action: () => Promise<void>,
+  action: (captured: { stdout: () => string; stderr: () => string }) => Promise<void>,
 ): Promise<{ stdout: string; stderr: string }> {
   const stdout: string[] = [];
   const stderr: string[] = [];
+  const captured = {
+    stdout: () => stdout.join("\n"),
+    stderr: () => stderr.join("\n"),
+  };
   const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
     stdout.push(args.join(" "));
   });
@@ -29,7 +33,7 @@ async function captureConsole(
     stderr.push(args.join(" "));
   });
   try {
-    await action();
+    await action(captured);
   } finally {
     log.mockRestore();
     error.mockRestore();
@@ -146,10 +150,12 @@ describe("nightcrew propose", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-03T09:30:00.000Z"));
 
-    const output = await captureConsole(async () => {
+    let stdoutBeforePrompt = "";
+    const output = await captureConsole(async (captured) => {
       await runPropose(requireProject().ctx(), "Add interactive selection", {
         isTty: true,
         prompt: async (proposal) => {
+          stdoutBeforePrompt = captured.stdout();
           expect(proposal.items.map((item) => item.id)).toEqual(["1", "2", "3"]);
           return ["2"];
         },
@@ -165,6 +171,12 @@ describe("nightcrew propose", () => {
     const crew = readFileSync(project.ctx().paths.crewFile, "utf8");
     expect(output.stderr).toBe("");
     expect(output.stdout).toContain(`created ${relPath}`);
+    expect(stdoutBeforePrompt).toContain("1. Minimal candidate");
+    expect(stdoutBeforePrompt).toContain("source lens: minimal_path");
+    expect(stdoutBeforePrompt).toContain(candidate("Minimal candidate", "minimal").body);
+    expect(stdoutBeforePrompt).toContain("3. Risk candidate");
+    expect(stdoutBeforePrompt).toContain("source lens: risk_first");
+    expect(stdoutBeforePrompt).toContain(candidate("Risk candidate", "risk").body);
     expect(output.stdout).toContain("selected 1 item");
     expect(output.stdout).toContain("archived .nightcrew/proposals/archive/");
     expect(crew).toContain(candidate("Architecture candidate", "architecture").body);
@@ -245,8 +257,10 @@ describe("nightcrew propose", () => {
     );
     expect(latest.stderr).toBe("");
     expect(latest.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
+    expect(latest.stdout).toContain("1. Review first [minimal_path]");
     expect(latest.stdout).toContain("1. Review first");
     expect(latest.stdout).toContain(candidate("Review first", "first").body);
+    expect(latest.stdout).not.toContain("source lens:");
     expect(latest.stdout).toContain(
       `select with: nightcrew propose select --ids 1,3 --proposal ${proposal.id}`,
     );
@@ -272,19 +286,26 @@ describe("nightcrew propose", () => {
     });
     const beforeCrew = readFileSync(project.ctx().paths.crewFile, "utf8");
 
-    const output = await captureConsole(async () => {
+    let stdoutBeforePrompt = "";
+    const output = await captureConsole(async (captured) => {
       await reviewProposal(
         requireProject().ctx(),
         { file: proposal.id },
         {
           isTty: true,
-          prompt: async () => [],
+          prompt: async () => {
+            stdoutBeforePrompt = captured.stdout();
+            return [];
+          },
         },
       );
     });
 
     expect(output.stderr).toBe("");
     expect(output.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
+    expect(stdoutBeforePrompt).toContain("1. Deferred item");
+    expect(stdoutBeforePrompt).toContain("source lens: minimal_path");
+    expect(stdoutBeforePrompt).toContain(candidate("Deferred item", "deferred").body);
     expect(output.stdout).toContain("no items selected; proposal left pending");
     expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
     expect(existsSync(file)).toBe(true);
