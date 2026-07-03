@@ -1,5 +1,7 @@
 # nightcrew
 
+[Languages: Simplified Chinese](README.zh-CN.md)
+
 > Your coding agents on the night shift.
 
 You write a backlog in plain markdown and go to bed. nightcrew turns it into

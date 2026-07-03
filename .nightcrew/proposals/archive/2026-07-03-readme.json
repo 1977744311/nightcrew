@@ -1,7 +1,7 @@
 {
   "version": 1,
   "id": "2026-07-03-readme",
-  "goal": "给仓库增加一个 readme 对应的中文版本，同时其他地方不应该出现中文了",
+  "goal": "Add a Chinese counterpart for the repository README while keeping Chinese text out of every other surface.",
   "status": "pending",
   "createdAt": "2026-07-03T07:02:44.484Z",
   "routingTier": "light",
