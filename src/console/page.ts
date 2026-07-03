@@ -62,6 +62,26 @@ export function consoleHtml(actions = false): string {
   .actions button { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
                     border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
   .actions button:hover { border-color: #35405a; }
+  .proposals { display: grid; gap: 12px; }
+  .proposal + .proposal { border-top: 1px solid var(--line); padding-top: 12px; }
+  .proposal-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .proposal-title { font-size: 13px; font-weight: 700; }
+  .proposal-items { list-style: none; margin: 8px 0 0; padding: 0; }
+  .proposal-item { padding: 8px 0; border-top: 1px solid #1a2030; }
+  .proposal-line { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px;
+                   align-items: center; }
+  .proposal-line input { width: 14px; height: 14px; accent-color: var(--blue); }
+  .proposal-line input:disabled { opacity: .45; }
+  .proposal-item-title { overflow-wrap: anywhere; }
+  .proposal-body { margin: 6px 0 0 26px; white-space: pre-wrap; color: var(--text);
+                   background: var(--panel2); border: 1px solid #1a2030; border-radius: 6px;
+                   padding: 8px 10px; font: inherit; font-size: 12px; }
+  .proposal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px;
+                      margin-top: 8px; }
+  .proposal-actions button { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+                             border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 12px;
+                             cursor: pointer; }
+  .proposal-actions button:hover { border-color: #35405a; }
 </style>
 </head>
 <body>
@@ -79,6 +99,29 @@ var es = null;
 function post(name, action) {
   fetch("/api/projects/" + encodeURIComponent(name) + "/" + action, { method: "POST" })
     .then(function () { route(); });
+}
+
+function approveProposal(name, proposalId, container) {
+  var checked = Array.prototype.slice.call(
+    container.querySelectorAll("input[type=checkbox]:checked")
+  ).map(function (input) { return input.value; });
+  var status = container.querySelector(".proposal-status");
+  if (!checked.length) {
+    if (status) status.textContent = "no items selected";
+    return;
+  }
+  fetch("/api/projects/" + encodeURIComponent(name) + "/proposals/approve", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ proposalId: proposalId, ids: checked }),
+  }).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.json();
+  }).then(function () {
+    route();
+  }).catch(function (e) {
+    if (status) status.textContent = "approval failed: " + e.message;
+  });
 }
 
 function actionButtons(name, state) {
@@ -148,6 +191,46 @@ function sparkline(records) {
   return svg;
 }
 
+function renderProposals(d) {
+  var proposals = d.proposals || [];
+  var body = proposals.length ? h("div", { class: "proposals" }, proposals.map(function (p) {
+    var section = h("div", { class: "proposal", "data-proposal-id": p.id }, []);
+    var items = h("ul", { class: "proposal-items" }, p.items.map(function (item) {
+      var inputAttrs = { type: "checkbox", value: item.id };
+      if (!ACTIONS) inputAttrs.disabled = "disabled";
+      return h("li", { class: "proposal-item" }, [
+        h("label", { class: "proposal-line" }, [
+          h("input", inputAttrs, []),
+          h("span", { class: "proposal-item-title" }, [item.id + ". " + item.title]),
+          h("span", { class: "badge" }, [item.lens]),
+        ]),
+        h("pre", { class: "proposal-body" }, [item.body]),
+      ]);
+    }));
+    var children = [
+      h("div", { class: "proposal-head" }, [
+        h("div", {}, [
+          h("div", { class: "proposal-title" }, [p.goal]),
+          h("div", { class: "kv" }, [p.id + "  " + fmtTime(p.createdAt)]),
+        ]),
+      ]),
+      items,
+    ];
+    if (ACTIONS) {
+      children.push(h("div", { class: "proposal-actions" }, [
+        h("span", { class: "proposal-status muted" }, []),
+        h("button", { onclick: function () { approveProposal(d.name, p.id, section); } }, ["approve selected"]),
+      ]));
+    }
+    children.forEach(function (child) { section.appendChild(child); });
+    return section;
+  })) : h("span", { class: "muted" }, ["none"]);
+  return h("section", {}, [
+    h("h3", {}, ["pending proposals (" + proposals.length + ")"]),
+    h("div", { class: "panel" }, [body]),
+  ]);
+}
+
 function renderBoard(projects) {
   if (es) { es.close(); es = null; }
   var cards = projects.map(function (p) {
@@ -195,6 +278,7 @@ function renderDetail(d) {
       ]),
       h("section", {}, [h("h3", {}, ["active plans (" + d.plans.active.length + ")"]),
         h("div", { class: "panel" }, [d.plans.active.length ? h("ul", { class: "plans" }, planItems) : h("span", { class: "muted" }, ["none"])])]),
+      renderProposals(d),
       h("section", {}, [h("h3", {}, ["token curve"]), h("div", { class: "panel" }, [sparkline(d.history)])]),
       h("section", {}, [h("h3", {}, ["live events"]), h("div", { class: "panel" }, [log])]),
       h("section", {}, [h("h3", {}, ["iterations"]),

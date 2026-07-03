@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { relative } from "node:path";
 import { projectPaths } from "../core/paths";
+import { parseProposalIds, selectProposalItems } from "../proposals/proposals";
 import { log } from "../utils/log";
 import { detail, registeredProjects, summarize } from "./data";
 import { consoleHtml } from "./page";
@@ -32,6 +34,10 @@ async function readBody(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+function parseJsonBody<T>(body: string): T {
+  return (body ? JSON.parse(body) : {}) as T;
+}
+
 function startSse(res: ServerResponse, file: string): void {
   res.writeHead(200, {
     "content-type": "text/event-stream",
@@ -56,8 +62,10 @@ function startSse(res: ServerResponse, file: string): void {
   });
 }
 
-export function createConsoleServer(options: ConsoleOptions): Server {
-  const server = createServer(async (req, res) => {
+export function createConsoleHandler(
+  options: Pick<ConsoleOptions, "actions"> = {},
+): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+  return async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const path = url.pathname;
 
@@ -101,7 +109,11 @@ export function createConsoleServer(options: ConsoleOptions): Server {
     } catch (error) {
       sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
     }
-  });
+  };
+}
+
+export function createConsoleServer(options: ConsoleOptions): Server {
+  const server = createServer(createConsoleHandler(options));
 
   server.listen(options.port, options.host ?? "127.0.0.1", () => {
     log.info(`console listening on http://${options.host ?? "127.0.0.1"}:${options.port}`);
@@ -142,6 +154,30 @@ async function handleAction(
     const { gcProject } = await import("../cli/gc");
     const result = await gcProject(root);
     sendJson(res, 200, { ok: true, ...result });
+    return true;
+  }
+  if (rest === "/proposals/approve") {
+    const body = parseJsonBody<{ proposalId?: unknown; ids?: unknown }>(await readBody(req));
+    if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== "string")) {
+      sendJson(res, 400, { error: "ids must be a non-empty string array" });
+      return true;
+    }
+    let ids: string[];
+    try {
+      ids = parseProposalIds(body.ids.join(","));
+    } catch (error) {
+      sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      return true;
+    }
+    const proposalIdOrFile =
+      typeof body.proposalId === "string" && body.proposalId.trim() ? body.proposalId : undefined;
+    const result = selectProposalItems(paths, { ids, proposalIdOrFile });
+    sendJson(res, 200, {
+      ok: true,
+      proposalId: result.proposal.id,
+      selectedItemIds: result.selectedItems.map((item) => item.id),
+      archivedFile: relative(root, result.archivedFile).replaceAll("\\", "/"),
+    });
     return true;
   }
   return false;

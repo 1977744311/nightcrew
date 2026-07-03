@@ -10,6 +10,9 @@
   generation and through `nightcrew propose review [--latest|<file>]`, reusing
   the same append-to-`crew.md` and archive path as `propose select`; non-TTY
   runs print numbered items with a `propose select --ids` hint.
+- Console project detail now lists pending proposal items and, when console
+  actions are enabled, approves selected ids through the same append/archive
+  path used by `nightcrew propose select`.
 
 ## 1.1.0
 
