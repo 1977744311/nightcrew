@@ -14,6 +14,7 @@ import { acquireProjectLock, lockHolder } from "../state/lock";
 import { updateState } from "../state/state";
 import { renderDoctorReport, runDoctorChecks } from "./doctor";
 import { initProject } from "./init";
+import { printProposalList, runPropose, selectProposal } from "./propose";
 import { printStatus } from "./status";
 
 function rootOf(options: { root?: string }): string {
@@ -209,6 +210,34 @@ export function buildProgram(): Command {
       } else {
         console.log(renderReport(report));
       }
+    });
+
+  const propose = program.command("propose").description("turn a goal into reviewable BACKLOG candidates");
+  propose
+    .argument("[goal...]", "one-line goal to research")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(async (goalParts: string[], options: { root?: string }) => {
+      if (goalParts.length === 0) {
+        throw new Error('missing goal; use `nightcrew propose "<goal>"`');
+      }
+      const ctx = loadProject(rootOf(options));
+      await runPropose(ctx, goalParts.join(" "));
+    });
+  propose
+    .command("list")
+    .description("list pending proposal artifacts")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(async (options: { root?: string }) => {
+      printProposalList(loadProject(rootOf(options)));
+    });
+  propose
+    .command("select")
+    .description("append selected proposal items to BACKLOG and archive the artifact")
+    .requiredOption("--ids <ids>", "comma-separated proposal item ids, e.g. 1,3")
+    .option("--proposal <id-or-file>", "proposal id or JSON file (default: latest pending)")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(async (options: { ids: string; proposal?: string; root?: string }) => {
+      selectProposal(loadProject(rootOf(options)), options.ids, options.proposal);
     });
 
   program

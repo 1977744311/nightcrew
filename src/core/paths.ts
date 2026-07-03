@@ -20,6 +20,8 @@ export interface ProjectPaths {
   logsDir: string;
   lockFile: string;
   worktreesDir: string;
+  proposalsDir: string;
+  archivedProposalsDir: string;
 }
 
 export function projectPaths(root: string): ProjectPaths {
@@ -44,6 +46,8 @@ export function projectPaths(root: string): ProjectPaths {
     logsDir: join(runtimeDir, "logs"),
     lockFile: join(runtimeDir, "daemon.lock"),
     worktreesDir: join(dir, "worktrees"),
+    proposalsDir: join(dir, "proposals"),
+    archivedProposalsDir: join(dir, "proposals", "archive"),
   };
 }
 

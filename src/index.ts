@@ -36,6 +36,28 @@ export type {
   ProviderRunOptions,
   ProviderRunResult,
 } from "./providers/types";
+export { generateProposal, PROPOSAL_OUTPUT_SCHEMA } from "./proposals/generate";
+export {
+  appendItemsToBacklog,
+  archiveProposal,
+  buildProposalArtifact,
+  latestPendingProposal,
+  listPendingProposals,
+  parseProposalIds,
+  PROPOSAL_ARTIFACT_VERSION,
+  proposalArtifactSchema,
+  PROPOSAL_LENSES,
+  readProposalArtifact,
+  selectProposalItems,
+  writeProposalArtifact,
+  type CandidateProposalItem,
+  type ProposalArtifact,
+  type ProposalArtifactFile,
+  type ProposalItem,
+  type ProposalLens,
+  type ProposalPass,
+  type SelectProposalResult,
+} from "./proposals/proposals";
 export { AgentReviewer, parseVerdict } from "./review/agent";
 export { buildReviewer } from "./review/factory";
 export { NullReviewer, type Reviewer } from "./review/types";
