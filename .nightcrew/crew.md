@@ -111,6 +111,36 @@ an empty backlog means the crew idles instead of inventing work.
       unaffected. Tests cover config parsing/defaults, adapter option
       passing, and the prompt containing the research guidance. Tests
       included.
+- [ ] Propose progress feedback + concurrent passes: run the three lens
+      passes concurrently (they are read-only and independent) and show
+      per-lens live progress. TTY mode: one status line per lens — running,
+      then completed with elapsed seconds and candidate count, or failed
+      with a short reason — so the operator watches three workers instead
+      of silence. Non-TTY mode: plain start/finish lines. Candidate
+      numbering must stay stable in lens order (minimal, architecture,
+      risk), never completion order. Error semantics unchanged: any failed
+      pass fails the whole command. Tests cover stable ordering under
+      out-of-order completion and the failure path. Tests included.
+- [ ] Proposal picker preview pane (kill the duplicated pre-print): in TTY
+      flows, stop printing the full candidate list before the picker.
+      Instead build a custom multiselect on `@clack/core` (already
+      installed — do NOT add other dependencies) where the highlighted
+      item's full body plus lens and rationale render in a preview area
+      below the option list, re-rendering as the cursor moves. Space
+      toggles, enter confirms, cancel selects nothing — semantics and the
+      append/archive flow stay identical to today. Non-TTY output stays
+      unchanged (numbered full bodies + `propose select --ids` hint).
+      Unit-test the preview rendering pure function; the raw TTY event
+      loop may stay untested. Tests included.
+- [ ] Propose mirrors the operator's language: candidate title, body, and
+      rationale must be written in the language of the goal text — a
+      Chinese goal yields Chinese candidates, an English goal yields
+      English. Implement as prompt instructions in the proposal passes (no
+      language-detection code); `propose refine` follows the language of
+      the operator feedback. Static CLI strings stay English. BACKLOG
+      format rules (checkbox first line, 3-10 lines) apply regardless of
+      language. Tests assert the prompts carry the language-mirroring
+      instruction. Tests included.
 - [ ] Config JSON Schema for editor autocomplete: generate
       `schema/config.schema.json` from the zod config schema using zod v4's
       native `z.toJSONSchema` (no new dependencies). Add an `npm run schema`
@@ -137,3 +167,10 @@ an empty backlog means the crew idles instead of inventing work.
       dogfood story (1.1-1.3 were built by nightcrew on itself, per
       CHANGELOG). Mark operator-voice gaps with `<!-- operator: ... -->`
       comments instead of fabricating. No code changes.
+
+- [ ] Add `README.zh-CN.md` as a Chinese translation of the current `README.md`, preserving the same structure, command names, config keys, links, status, and license details.
+      Add an English-only language link from `README.md` to `README.zh-CN.md`, and a backlink from the Chinese file to `README.md`.
+      Keep Han-script text allowed only in `README.zh-CN.md`; no source, tests, docs, package metadata, changelog text, or CLI output should contain Chinese.
+      Add focused tests that scan tracked text files for Han characters outside `README.zh-CN.md` and assert package publishing metadata includes the localized README.
+      Include `README.zh-CN.md` in package publishing metadata so the localized README ships with npm package contents.
+      Update `CHANGELOG.md` under `## Unreleased`. Tests included.

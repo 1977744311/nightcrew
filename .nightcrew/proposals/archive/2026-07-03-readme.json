@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "id": "2026-07-03-readme",
+  "goal": "给仓库增加一个 readme 对应的中文版本，同时其他地方不应该出现中文了",
+  "status": "pending",
+  "createdAt": "2026-07-03T07:02:44.484Z",
+  "routingTier": "light",
+  "items": [
+    {
+      "id": "1",
+      "title": "Add Chinese README With Locale Guard",
+      "body": "- [ ] Add `README.zh-CN.md` as a Chinese translation of the current `README.md`, preserving the same structure, command names, config keys, links, status, and license details.\n      Add an English-only language link from `README.md` to `README.zh-CN.md`, and a backlink from the Chinese file to `README.md`.\n      Keep Han-script text allowed only in `README.zh-CN.md`; no source, tests, docs, package metadata, changelog text, or CLI output should contain Chinese.\n      Add focused tests that scan tracked text files for Han characters outside `README.zh-CN.md` and assert package publishing metadata includes the localized README.\n      Include `README.zh-CN.md` in package publishing metadata so the localized README ships with npm package contents.\n      Update `CHANGELOG.md` under `## Unreleased`. Tests included.",
+      "rationale": "Minimal path: this is one docs file, one English README link, package metadata, and a narrow invariant test. The repo currently has no Han-script matches, so the guard is cheap and directly enforces the operator's boundary. GitHub documents that root READMEs are surfaced to repository visitors and relative links are supported: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes. npm documents root README handling and package file inclusion rules: https://docs.npmjs.com/about-package-readme-files/ and https://docs.npmjs.com/cli/v11/configuring-npm/package-json#files.",
+      "lens": "minimal_path"
+    },
+    {
+      "id": "2",
+      "title": "Chinese README Localization Boundary",
+      "body": "- [ ] Add `README.zh-Hans.md` as the sole Chinese documentation surface: a faithful Simplified Chinese version of `README.md`, with the English README remaining canonical.\n      Add compact language links at the top of both READMEs using relative links, and include `README.zh-Hans.md` in the npm package `files` list.\n      Add a focused test that scans tracked repo files and fails if Han characters appear outside `README.zh-Hans.md`.\n      Keep all other docs, source, tests, templates, and CHANGELOG text in English.\n      Update `CHANGELOG.md` under `## Unreleased`.",
+      "rationale": "Architecture-first fit: this creates a clear localization boundary (`README.zh-Hans.md` plus an allowlist test) instead of relying on convention. GitHub documents README files as the surfaced repository entry point and recommends relative links for repository-local navigation (https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes). W3C’s language-tag guidance identifies `zh-Hans` as Simplified Chinese and ties language tags to BCP 47, making the filename explicit and durable (https://www.w3.org/International/articles/language-tags/).",
+      "lens": "architecture_first"
+    },
+    {
+      "id": "3",
+      "title": "Chinese README with language guard",
+      "body": "- [ ] Add `README.zh-CN.md` as the Simplified Chinese counterpart to `README.md`, preserving the same section order, command names, examples, and links where applicable.\n      Add an English-only translation link in `README.md` that points to `README.zh-CN.md`, and include the translated file in the published package surface.\n      Add a docs test that compares the README heading outline and required command names between the English and Chinese files so the translation cannot silently drift.\n      Add a docs test that scans tracked first-party text files and fails on Han characters outside `README.zh-CN.md`, excluding generated/vendor outputs only.\n      Update `CHANGELOG.md` under `## Unreleased` in English. Tests included.",
+      "rationale": "Risk-first: the main failure modes are translation drift, package omission, and Chinese text leaking into source, docs, or CLI strings. The repo currently has a single English README, no Han characters in first-party files, and package.json only lists README.md in files, so this candidate adds the translation plus executable guardrails before expanding any broader localization surface.",
+      "lens": "risk_first"
+    }
+  ],
+  "passes": [
+    {
+      "lens": "minimal_path",
+      "sessionId": "019f26c5-5c52-7c02-9eb1-79a3ff758146",
+      "usage": {
+        "inputTokens": 85918,
+        "cachedInputTokens": 23168,
+        "outputTokens": 3909,
+        "reasoningOutputTokens": 3186
+      }
+    },
+    {
+      "lens": "architecture_first",
+      "sessionId": "019f26c6-aa3c-7423-abf6-a3c7ef56bdda",
+      "usage": {
+        "inputTokens": 124576,
+        "cachedInputTokens": 62080,
+        "outputTokens": 3318,
+        "reasoningOutputTokens": 2267
+      }
+    },
+    {
+      "lens": "risk_first",
+      "sessionId": "019f26c7-d31a-7a51-9b68-7b6178839681",
+      "usage": {
+        "inputTokens": 140921,
+        "cachedInputTokens": 85376,
+        "outputTokens": 4673,
+        "reasoningOutputTokens": 3328
+      }
+    }
+  ]
+}

@@ -51,6 +51,7 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
+    "@clack/core": "^1.4.2",
     "@clack/prompts": "^1.6.0",
     "@openai/codex-sdk": "^0.142.5",
     "commander": "^15.0.0",
