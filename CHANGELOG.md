@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added `notify.webhook` with optional event filtering for deterministic JSON
+  webhook notifications when loops stop, open questions are appended, or pending
+  proposals land.
+
 ## 1.4.0
 
 The polish release: propose runs three concurrent research passes with live
