@@ -78,3 +78,23 @@ an empty backlog means the crew idles instead of inventing work.
       Use that model from `nightcrew report` and `src/console/data.ts` so the project detail JSON exposes a stable per-plan metrics field instead of page-only aggregation.
       Render a per-plan table on the console project detail page with token totals and human-readable duration while preserving the existing summary, proposals, token curve, and history table.
       Tests included for aggregation, console detail JSON, and the HTML rendering path.
+- [ ] Proposal picker must show full item bodies: in TTY flows (after
+      generation and in `propose review`), print every candidate — id,
+      title, lens, and the full backlog body — BEFORE opening the checkbox
+      picker, so the operator reads the exact text they are approving.
+      Keep picker option labels short (id + title, lens as hint) and the
+      non-TTY output unchanged. Test the pre-picker printing through the
+      injectable prompt seam. Tests included.
+- [ ] `nightcrew propose refine`: feedback-and-regenerate for proposals.
+      Non-interactive: `nightcrew propose refine [<id-or-file>] --feedback
+      "<text>"` (default: latest pending). Interactive: when the TTY picker
+      closes with zero selections, prompt once for optional feedback text;
+      empty input leaves the proposal pending and untouched. Refine reruns
+      the three lens passes with the original goal PLUS the previous
+      candidates (id/title/lens) and the operator feedback in each prompt,
+      writes a NEW pending artifact recording `refinedFrom` (source id) and
+      the feedback text (additive optional schema fields), archives the
+      source artifact, and in TTY reopens the picker on the new artifact.
+      Fake-provider tests cover: feedback present in rerun prompts, lineage
+      fields, source archived, and the zero-selection/no-feedback path
+      changing nothing. Tests included.
