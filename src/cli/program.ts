@@ -71,8 +71,12 @@ export function buildProgram(): Command {
     .description("scaffold .nightcrew/ in the current repo and register it")
     .option("--root <dir>", "project root (default: cwd)")
     .option("--name <name>", "project name (default: directory name)")
-    .action(async (options: { root?: string; name?: string }) => {
-      await initProject(rootOf(options), { name: options.name });
+    .option("--assist", "inspect the repo with a read-only provider pass and draft config first")
+    .action(async (options: { root?: string; name?: string; assist?: boolean }) => {
+      await initProject(rootOf(options), {
+        name: options.name,
+        assist: options.assist ?? false,
+      });
     });
 
   program
