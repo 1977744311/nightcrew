@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { relative } from "node:path";
+import { loadProject } from "../config/load";
 import { projectPaths } from "../core/paths";
+import { notifyWebhook } from "../notify/webhook";
 import {
   appendItemsToBacklog,
   parseProposalIds,
@@ -178,6 +180,16 @@ async function handleAction(
     const proposalIdOrFile =
       typeof body.proposalId === "string" && body.proposalId.trim() ? body.proposalId : undefined;
     const result = selectProposalItems(paths, { ids, proposalIdOrFile });
+    try {
+      await notifyWebhook(loadProject(root), {
+        event: "proposal_landed",
+        proposalId: result.proposal.id,
+        selectedItems: result.selectedItems.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.warn(`notify webhook proposal_landed failed: ${message}`);
+    }
     sendJson(res, 200, {
       ok: true,
       proposalId: result.proposal.id,
