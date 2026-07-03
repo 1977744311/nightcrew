@@ -41,3 +41,35 @@ an empty backlog means the crew idles instead of inventing work.
       per-plan table (iterations, tokens, landed or not) so the operator sees
       where the night's budget went. Keep the existing summary intact. Tests
       included.
+- [ ] `nightcrew propose "<goal>"`: turn a one-line goal into reviewable
+      BACKLOG candidates. Run 3 independent read-only research passes over
+      the repo (lenses: minimal path / architecture-first / risk-first), each
+      returning structured JSON via the provider `outputSchema` (reuse the
+      reviewer's fresh-session pattern; the fake provider must remain
+      scriptable for tests). Persist ONE proposal artifact under
+      `.nightcrew/proposals/` (JSON with a stable schema and stable item ids;
+      must survive across command invocations) holding every candidate item:
+      id, title, backlog-ready body (3-10 lines, checkbox-format text),
+      rationale, source lens. Add `routing.propose` config (light|heavy,
+      default light). Include a non-interactive approval path:
+      `nightcrew propose select --ids 1,3` appends the chosen items verbatim
+      to the `## BACKLOG` section of `.nightcrew/crew.md` in checkbox format
+      and archives the proposal artifact. `propose list` shows pending
+      proposals. Tests included.
+- [ ] Interactive picker for propose: when stdout is a TTY, after generation
+      finishes (and via `nightcrew propose review [--latest|<file>]` for a
+      stored proposal) open an in-terminal checkbox picker: arrow keys move,
+      space toggles items, enter confirms, and aborting selects nothing.
+      Selected items flow through the exact same append-to-crew.md +
+      archive path as `propose select`. Use `@clack/prompts` (already
+      installed as a dependency — do NOT add other new dependencies).
+      Non-TTY environments fall back to printing numbered items plus a hint
+      to use `propose select --ids`. Unit-test the selection/merge logic and
+      the non-TTY fallback; the raw TTY event loop itself may stay untested.
+      Tests included.
+- [ ] Console support for proposals: the project detail page lists pending
+      proposal items (title + body + lens) with checkboxes. With `--actions`
+      enabled, an approve button POSTs the selected item ids to a new
+      endpoint that reuses the same append-to-crew.md + archive path; without
+      actions the list renders read-only and the endpoint returns 404. Tests
+      included.
