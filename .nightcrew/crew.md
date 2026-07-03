@@ -111,3 +111,29 @@ an empty backlog means the crew idles instead of inventing work.
       unaffected. Tests cover config parsing/defaults, adapter option
       passing, and the prompt containing the research guidance. Tests
       included.
+- [ ] Config JSON Schema for editor autocomplete: generate
+      `schema/config.schema.json` from the zod config schema using zod v4's
+      native `z.toJSONSchema` (no new dependencies). Add an `npm run schema`
+      script, commit the generated file, and add a test that regenerates the
+      schema and fails when the committed file is out of sync. Update the
+      `nightcrew init` config template to start with a
+      `# yaml-language-server: $schema=` comment pointing at the raw GitHub
+      URL of the committed schema so editors autocomplete `config.yaml`.
+      Tests included.
+- [ ] Release automation with changesets + npm provenance: add
+      `.github/workflows/release.yml` using the official changesets action
+      (version PR flow; publish runs `npm publish --provenance` and needs the
+      `NPM_TOKEN` secret — configuring the secret itself is operator work,
+      document that plus the release steps in CONTRIBUTING). Set
+      `publishConfig.provenance` in package.json. Do NOT change existing CI
+      or version numbers. Keep the manual `npm version` + tag flow documented
+      as fallback.
+- [ ] Launch write-up draft at `docs/launch.md`: "what 700+ unattended
+      iterations taught us about loop engineering". Ground every claim ONLY
+      in ROADMAP.md (requirements table, constitution), docs/concepts.md,
+      and CHANGELOG.md — do not invent metrics, benchmarks, or anecdotes not
+      present in those files. Structure: the failure modes of unattended
+      agent loops → the guard/review/worktree answers nightcrew ships → the
+      dogfood story (1.1-1.3 were built by nightcrew on itself, per
+      CHANGELOG). Mark operator-voice gaps with `<!-- operator: ... -->`
+      comments instead of fabricating. No code changes.
