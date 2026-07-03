@@ -98,3 +98,16 @@ an empty backlog means the crew idles instead of inventing work.
       Fake-provider tests cover: feedback present in rerun prompts, lineage
       fields, source archived, and the zero-selection/no-feedback path
       changing nothing. Tests included.
+- [ ] Web search support: add `provider.codex.webSearch` config
+      (`disabled | cached | live`, default `cached` to match current SDK
+      behavior) and pass it to the SDK ThreadOptions as `webSearchMode`;
+      allow an optional per-operation override map (at minimum `propose`
+      must be overridable, e.g. propose uses `live` while execute stays
+      `cached`). Then extend the propose research prompt: when the goal
+      involves external ecosystems (UI patterns, library choices, best
+      practices), instruct the pass to run web searches first and cite
+      1-2 reference sources inside the candidate `rationale` field so the
+      operator sees them in the picker and console. Keep the fake provider
+      unaffected. Tests cover config parsing/defaults, adapter option
+      passing, and the prompt containing the research guidance. Tests
+      included.
