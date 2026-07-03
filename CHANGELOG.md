@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a generated JSON Schema for `.nightcrew/config.yaml`, an `npm run schema`
+  sync path, and a `nightcrew init` YAML language-server comment pointing
+  editors at the committed schema.
 - Proposal generation and refinement prompts now ask candidate titles, bodies,
   and rationales to mirror the operator goal or feedback language while keeping
   BACKLOG checkbox formatting intact.
