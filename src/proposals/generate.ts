@@ -3,7 +3,10 @@ import type { ProjectPaths } from "../core/paths";
 import { proposeModel } from "../providers/factory";
 import type { Provider } from "../providers/types";
 import { readTextIfExists } from "../utils/fs";
+import type { ProposalArtifact } from "./proposals";
 import {
+  archiveProposal,
+  nextRefinedProposalId,
   PROPOSAL_LENSES,
   type ProposalArtifactFile,
   type ProposalLens,
@@ -65,6 +68,20 @@ export interface GenerateProposalOptions {
   provider: Provider;
 }
 
+export interface RefineProposalOptions {
+  source: ProposalArtifactFile;
+  feedback: string;
+  root: string;
+  paths: ProjectPaths;
+  config: NightcrewConfig;
+  provider: Provider;
+}
+
+export interface RefineProposalResult {
+  artifact: ProposalArtifactFile;
+  archivedFile: string;
+}
+
 function parseJsonObject(text: string): unknown {
   const candidates: string[] = [];
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -121,8 +138,12 @@ function proposalPrompt(input: {
   projectName: string;
   lens: ProposalLens;
   crew: string;
+  refinement?: {
+    source: ProposalArtifact;
+    feedback: string;
+  };
 }): string {
-  return [
+  const lines = [
     `You are researching BACKLOG candidates for the nightcrew project "${input.projectName}".`,
     "This is a read-only proposal pass. Inspect the repository if needed, but do not modify files.",
     "Use a fresh, independent judgment for this pass.",
@@ -131,6 +152,27 @@ function proposalPrompt(input: {
     "",
     input.goal,
     "",
+  ];
+
+  if (input.refinement) {
+    lines.push(
+      "## Refinement Context",
+      "",
+      `Previous proposal: ${input.refinement.source.id}`,
+      "",
+      "Previous candidate summaries:",
+      ...input.refinement.source.items.map((item) => `- ${item.id}. ${item.title} [${item.lens}]`),
+      "",
+      "Operator feedback:",
+      "",
+      input.refinement.feedback,
+      "",
+      "Regenerate candidates that respond directly to the feedback while preserving the original goal.",
+      "",
+    );
+  }
+
+  lines.push(
     "## Source Lens",
     "",
     `${LENS_LABELS[input.lens]}: ${LENS_INSTRUCTIONS[input.lens]}`,
@@ -158,12 +200,24 @@ function proposalPrompt(input: {
     "```json",
     '{ "candidates": [{ "title": "<short title>", "body": "- [ ] ...", "rationale": "<why this candidate fits this lens>" }] }',
     "```",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
-export async function generateProposal(
-  options: GenerateProposalOptions,
-): Promise<ProposalArtifactFile> {
+async function runProposalPasses(options: {
+  goal: string;
+  root: string;
+  paths: ProjectPaths;
+  config: NightcrewConfig;
+  provider: Provider;
+  refinement?: {
+    source: ProposalArtifact;
+    feedback: string;
+  };
+}): Promise<{
+  items: Array<LensCandidate & { lens: ProposalLens }>;
+  passes: ProposalPass[];
+}> {
   const goal = options.goal.trim();
   if (!goal) throw new Error("proposal goal is required");
 
@@ -178,6 +232,7 @@ export async function generateProposal(
         projectName: options.config.project.name,
         lens,
         crew,
+        ...(options.refinement ? { refinement: options.refinement } : {}),
       }),
       workingDirectory: options.root,
       model: proposeModel(options.config),
@@ -203,10 +258,48 @@ export async function generateProposal(
     throw new Error("proposal generation produced no candidate items");
   }
 
+  return { items, passes };
+}
+
+export async function generateProposal(
+  options: GenerateProposalOptions,
+): Promise<ProposalArtifactFile> {
+  const goal = options.goal.trim();
+  const { items, passes } = await runProposalPasses(options);
+
   return writeProposalArtifact(options.paths, {
     goal,
     routingTier: options.config.routing.propose,
     items,
     passes,
   });
+}
+
+export async function refineProposal(
+  options: RefineProposalOptions,
+): Promise<RefineProposalResult> {
+  const feedback = options.feedback.trim();
+  if (!feedback) throw new Error("proposal feedback is required");
+
+  const source = options.source.proposal;
+  const { items, passes } = await runProposalPasses({
+    goal: source.goal,
+    root: options.root,
+    paths: options.paths,
+    config: options.config,
+    provider: options.provider,
+    refinement: { source, feedback },
+  });
+
+  const artifact = writeProposalArtifact(options.paths, {
+    id: nextRefinedProposalId(options.paths, source.id),
+    goal: source.goal,
+    routingTier: options.config.routing.propose,
+    refinedFrom: source.id,
+    feedback,
+    items,
+    passes,
+  });
+  const archivedFile = archiveProposal(options.paths, options.source.file);
+  return { artifact, archivedFile };
 }
