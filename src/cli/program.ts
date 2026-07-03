@@ -21,6 +21,11 @@ function rootOf(options: { root?: string }): string {
   return resolve(options.root ?? process.cwd());
 }
 
+function rootOption(options: { root?: string }, command?: Command): string {
+  const parentOptions = (command?.parent?.opts() ?? {}) as { root?: string };
+  return rootOf({ root: options.root ?? parentOptions.root });
+}
+
 function parseHours(value: string): number {
   const hours = Number(value);
   if (!Number.isFinite(hours) || hours < 0) {
@@ -227,8 +232,8 @@ export function buildProgram(): Command {
     .command("list")
     .description("list pending proposal artifacts")
     .option("--root <dir>", "project root (default: cwd)")
-    .action(async (options: { root?: string }) => {
-      printProposalList(loadProject(rootOf(options)));
+    .action(async (options: { root?: string }, command: Command) => {
+      printProposalList(loadProject(rootOption(options, command)));
     });
   propose
     .command("select")
@@ -236,9 +241,11 @@ export function buildProgram(): Command {
     .requiredOption("--ids <ids>", "comma-separated proposal item ids, e.g. 1,3")
     .option("--proposal <id-or-file>", "proposal id or JSON file (default: latest pending)")
     .option("--root <dir>", "project root (default: cwd)")
-    .action(async (options: { ids: string; proposal?: string; root?: string }) => {
-      selectProposal(loadProject(rootOf(options)), options.ids, options.proposal);
-    });
+    .action(
+      async (options: { ids: string; proposal?: string; root?: string }, command: Command) => {
+        selectProposal(loadProject(rootOption(options, command)), options.ids, options.proposal);
+      },
+    );
 
   program
     .command("console")
