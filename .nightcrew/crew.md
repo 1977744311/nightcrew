@@ -41,7 +41,7 @@ an empty backlog means the crew idles instead of inventing work.
       per-plan table (iterations, tokens, landed or not) so the operator sees
       where the night's budget went. Keep the existing summary intact. Tests
       included.
-- [ ] `nightcrew propose "<goal>"`: turn a one-line goal into reviewable
+- [x] `nightcrew propose "<goal>"`: turn a one-line goal into reviewable
       BACKLOG candidates. Run 3 independent read-only research passes over
       the repo (lenses: minimal path / architecture-first / risk-first), each
       returning structured JSON via the provider `outputSchema` (reuse the
@@ -56,7 +56,7 @@ an empty backlog means the crew idles instead of inventing work.
       to the `## BACKLOG` section of `.nightcrew/crew.md` in checkbox format
       and archives the proposal artifact. `propose list` shows pending
       proposals. Tests included.
-- [ ] Interactive picker for propose: when stdout is a TTY, after generation
+- [x] Interactive picker for propose: when stdout is a TTY, after generation
       finishes (and via `nightcrew propose review [--latest|<file>]` for a
       stored proposal) open an in-terminal checkbox picker: arrow keys move,
       space toggles items, enter confirms, and aborting selects nothing.
@@ -67,9 +67,14 @@ an empty backlog means the crew idles instead of inventing work.
       to use `propose select --ids`. Unit-test the selection/merge logic and
       the non-TTY fallback; the raw TTY event loop itself may stay untested.
       Tests included.
-- [ ] Console support for proposals: the project detail page lists pending
+- [x] Console support for proposals: the project detail page lists pending
       proposal items (title + body + lens) with checkboxes. With `--actions`
       enabled, an approve button POSTs the selected item ids to a new
       endpoint that reuses the same append-to-crew.md + archive path; without
       actions the list renders read-only and the endpoint returns 404. Tests
       included.
+
+- [ ] Console project detail per-plan accounting: extract report-style plan history aggregation into a shared module that returns plan id, title, iterations, total tokens, durationMs, and landed/pending status.
+      Use that model from `nightcrew report` and `src/console/data.ts` so the project detail JSON exposes a stable per-plan metrics field instead of page-only aggregation.
+      Render a per-plan table on the console project detail page with token totals and human-readable duration while preserving the existing summary, proposals, token curve, and history table.
+      Tests included for aggregation, console detail JSON, and the HTML rendering path.

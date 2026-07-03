@@ -44,6 +44,7 @@ cd your-repo
 nightcrew init             # scaffolds .nightcrew/ and registers the project
 nightcrew doctor           # first-run sanity check: runtime, repo, config, registry, lock
 $EDITOR .nightcrew/crew.md # write rules + BACKLOG items
+nightcrew propose "goal"   # or: let 3 research passes draft the backlog, pick items in-terminal
 
 nightcrew run              # one supervised iteration, to build trust
 nightcrew loop             # a bounded unattended session (default 20 iterations)
@@ -111,6 +112,7 @@ Everything you and the crew say to each other lives in markdown, in your repo:
 | `nightcrew status` | Plans, streaks, worktrees, recent iterations |
 | `nightcrew report` | Morning digest: landed, failed, cost, open questions |
 | `nightcrew plan add <title>` | Create an active plan scaffold |
+| `nightcrew propose "<goal>"` | 3 research passes draft BACKLOG candidates; pick via checkbox TUI, `propose select --ids`, or the console |
 | `nightcrew plan list/show` | Inspect plans |
 | `nightcrew pause/resume` | Suspend / wake the loop (also from console and `crew`) |
 | `nightcrew console` | Local web console: board, history, token curve, live events |

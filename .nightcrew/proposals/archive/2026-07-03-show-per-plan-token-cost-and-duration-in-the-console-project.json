@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "id": "2026-07-03-show-per-plan-token-cost-and-duration-in-the-console-project",
+  "goal": "Show per-plan token cost and duration in the console project detail page",
+  "status": "pending",
+  "createdAt": "2026-07-03T04:53:52.818Z",
+  "routingTier": "light",
+  "items": [
+    {
+      "id": "1",
+      "title": "Console per-plan cost table",
+      "body": "- [ ] Console project detail shows a per-plan cost table on the detail page.\n      Aggregate the existing detail history by plan id, summing iterations, total tokens, and durationMs.\n      Render plan id, iterations, tokens, duration, and landed/pending status above the iteration log.\n      Tests included for the console detail data/rendering path with multiple plans and ignored unscoped iterations.",
+      "rationale": "Minimal path: the console detail API already sends recent history with usage, durationMs, planId, and merged, so this can be a small frontend aggregation plus focused console tests without introducing new report plumbing or schema churn.",
+      "lens": "minimal_path"
+    },
+    {
+      "id": "2",
+      "title": "Shared per-plan console accounting",
+      "body": "- [ ] Console project detail per-plan accounting: extract report-style plan history aggregation into a shared module that returns plan id, title, iterations, total tokens, durationMs, and landed/pending status.\n      Use that model from `nightcrew report` and `src/console/data.ts` so the project detail JSON exposes a stable per-plan metrics field instead of page-only aggregation.\n      Render a per-plan table on the console project detail page with token totals and human-readable duration while preserving the existing summary, proposals, token curve, and history table.\n      Tests included for aggregation, console detail JSON, and the HTML rendering path.",
+      "rationale": "The architecture-first path is to establish one durable per-plan accounting model backed by history records, then have both CLI reporting and console data consume it. That avoids duplicating token and duration math in the frontend and creates a stable API field for future console views.",
+      "lens": "architecture_first"
+    },
+    {
+      "id": "3",
+      "title": "Console Plan Cost/Duration Table",
+      "body": "- [ ] Console project detail per-plan cost/duration: extract a shared\n      plan metrics projection over full history that groups plan-scoped\n      iterations by plan id, sums total tokens and durationMs, resolves\n      titles across active/paused/completed plans, and marks landed/pending.\n      Expose the metrics from the project detail API and render a table with\n      plan, iterations, tokens, duration, and status while keeping the existing\n      summary, token curve, proposals, and iteration history intact.\n      Tests included.",
+      "rationale": "Risk-first: the main correctness risk is misleading totals from ad hoc frontend math or the console's capped recent-history view. A shared, tested history projection gives the console accurate per-plan token and duration data and reduces drift with the existing report breakdown before adding the UI.",
+      "lens": "risk_first"
+    }
+  ],
+  "passes": [
+    {
+      "lens": "minimal_path",
+      "sessionId": "019f2650-8638-7f52-bc53-1d618c06b954",
+      "usage": {
+        "inputTokens": 167415,
+        "cachedInputTokens": 113408,
+        "outputTokens": 1703,
+        "reasoningOutputTokens": 794
+      }
+    },
+    {
+      "lens": "architecture_first",
+      "sessionId": "019f2651-3b6a-7d22-9b0d-9bb362ece138",
+      "usage": {
+        "inputTokens": 131536,
+        "cachedInputTokens": 87552,
+        "outputTokens": 2350,
+        "reasoningOutputTokens": 1429
+      }
+    },
+    {
+      "lens": "risk_first",
+      "sessionId": "019f2652-06a7-70d1-a9ae-9c3ca1fb15fe",
+      "usage": {
+        "inputTokens": 223776,
+        "cachedInputTokens": 149632,
+        "outputTokens": 4309,
+        "reasoningOutputTokens": 2811
+      }
+    }
+  ]
+}

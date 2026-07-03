@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.2.0
+
+The propose release: goal in, ratified backlog out. All three features below
+were built by nightcrew on itself (3 plans, 8 iterations, one unattended run).
 
 - `nightcrew propose "<goal>"`: run three read-only structured Codex-provider
   proposal passes, persist one stable JSON artifact under `.nightcrew/proposals/`,
