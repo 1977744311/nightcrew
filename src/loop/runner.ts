@@ -29,7 +29,7 @@ import { ensureWorktree, planBranch, removeWorktree } from "../git/worktree";
 import { findPlan, listPlans, movePlan, readPlan, validatePlan } from "../plans/plans";
 import { overTokenCap, quotaResumeAt } from "../policy/budget";
 import { applyIteration } from "../policy/guards";
-import { modelForOperation } from "../providers/factory";
+import { modelForOperation, webSearchModeFor } from "../providers/factory";
 import { allCheckboxesDone, parseSignals, renderPrompt } from "../providers/render";
 import type { Provider, ProviderRunResult } from "../providers/types";
 import type { Reviewer } from "../review/types";
@@ -296,6 +296,7 @@ async function runControlOp(
     prompt,
     workingDirectory: root,
     model: modelForOperation(config, operation),
+    webSearchMode: webSearchModeFor(config, operation),
     sessionId: null,
     timeoutMs: config.loop.iterationTimeoutMs,
     idleTimeoutMs: config.loop.idleTimeoutMs,
@@ -525,6 +526,7 @@ async function runCodeOp(
     prompt,
     workingDirectory: worktree.path,
     model: modelForOperation(config, operation),
+    webSearchMode: webSearchModeFor(config, operation),
     sessionId: state.sessions[plan.id] ?? null,
     timeoutMs: config.loop.iterationTimeoutMs,
     idleTimeoutMs: config.loop.idleTimeoutMs,

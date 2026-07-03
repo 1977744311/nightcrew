@@ -3,11 +3,13 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/program";
 import { reviewProposal, runPropose } from "../src/cli/propose";
+import { generateProposal } from "../src/proposals/generate";
 import {
   listPendingProposals,
   readProposalArtifact,
   writeProposalArtifact,
 } from "../src/proposals/proposals";
+import type { Provider, ProviderRunOptions } from "../src/providers/types";
 import { makeTempProject, type TestProject } from "./helpers";
 
 let project: TestProject | undefined;
@@ -174,6 +176,53 @@ describe("nightcrew propose", () => {
       runCli(["propose", "Add proposal workflow", "--root", project?.root ?? ""]),
     );
     expect(listPendingProposals(project.ctx().paths).map((entry) => entry.file)).toEqual([file]);
+  });
+
+  it("passes the propose web-search override and includes external research guidance", async () => {
+    project = await makeTempProject();
+    project.setConfig({
+      provider: {
+        default: "fake",
+        fake: { script: project.scriptFile },
+        codex: {
+          tiers: { light: "proposal-light" },
+          webSearch: "cached",
+          webSearchOverrides: { propose: "live" },
+        },
+      },
+    });
+    const runs: ProviderRunOptions[] = [];
+    const provider: Provider = {
+      name: "capture",
+      run: async (options) => {
+        runs.push(options);
+        return {
+          status: "ok",
+          finalMessage: JSON.stringify({
+            candidates: [candidate(`Candidate ${runs.length}`, "capture")],
+          }),
+          sessionId: `capture-${runs.length}`,
+          usage: null,
+        };
+      },
+    };
+
+    await generateProposal({
+      goal: "Choose current UI library best practices",
+      root: project.root,
+      paths: project.ctx().paths,
+      config: project.ctx().config,
+      provider,
+    });
+
+    expect(runs).toHaveLength(3);
+    expect(runs.map((run) => run.webSearchMode)).toEqual(["live", "live", "live"]);
+    expect(runs[0]?.prompt).toContain("## External Ecosystem Research");
+    expect(runs[0]?.prompt).toContain("run web searches first before proposing candidates");
+    expect(runs[0]?.prompt).toContain(
+      "cite 1-2 reference sources inside that candidate's `rationale` field",
+    );
+    expect(runs[0]?.prompt).toContain("do not add fields or change the JSON output shape");
   });
 
   it("selects generated proposal items through the interactive helper and archives the artifact", async () => {

@@ -1,6 +1,6 @@
 import type { NightcrewConfig } from "../config/schema";
 import type { ProjectPaths } from "../core/paths";
-import { proposeModel } from "../providers/factory";
+import { proposeModel, webSearchModeFor } from "../providers/factory";
 import type { Provider } from "../providers/types";
 import { readTextIfExists } from "../utils/fs";
 import type { ProposalArtifact } from "./proposals";
@@ -177,6 +177,12 @@ function proposalPrompt(input: {
     "",
     `${LENS_LABELS[input.lens]}: ${LENS_INSTRUCTIONS[input.lens]}`,
     "",
+    "## External Ecosystem Research",
+    "",
+    "- When the goal involves external ecosystems (UI patterns, library choices, framework APIs, vendor services, best practices, ecosystem norms, or current third-party behavior), run web searches first before proposing candidates.",
+    "- For candidates that rely on external findings, cite 1-2 reference sources inside that candidate's `rationale` field.",
+    "- Keep citations inside `rationale`; do not add fields or change the JSON output shape.",
+    "",
     "## Existing Operator Surface",
     "",
     "```md",
@@ -236,6 +242,7 @@ async function runProposalPasses(options: {
       }),
       workingDirectory: options.root,
       model: proposeModel(options.config),
+      webSearchMode: webSearchModeFor(options.config, "propose"),
       sessionId: null,
       timeoutMs: Math.min(options.config.loop.iterationTimeoutMs, 900_000),
       idleTimeoutMs: options.config.loop.idleTimeoutMs,

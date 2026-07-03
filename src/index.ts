@@ -15,6 +15,7 @@ export { buildReport, type ReportData, type ReportPlanBreakdown, renderReport } 
 export { ConfigError, loadConfig, loadProject, type ProjectContext } from "./config/load";
 export { readRegistry, registerProject, registryFile } from "./config/registry";
 export {
+  type CodexWebSearchMode,
   type CommandStep,
   configSchema,
   type NightcrewConfig,
@@ -62,7 +63,7 @@ export {
   selectProposalItems,
   writeProposalArtifact,
 } from "./proposals/proposals";
-export { buildProvider } from "./providers/factory";
+export { buildProvider, type ProviderOperation, webSearchModeFor } from "./providers/factory";
 export { renderPrompt } from "./providers/render";
 export type {
   Provider,

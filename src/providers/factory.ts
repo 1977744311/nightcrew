@@ -1,9 +1,11 @@
 import { isAbsolute, resolve } from "node:path";
-import type { NightcrewConfig } from "../config/schema";
+import type { CodexWebSearchMode, NightcrewConfig } from "../config/schema";
 import type { ModelTier, Operation } from "../core/types";
 import { CodexProvider } from "./codex";
 import { FakeProvider } from "./fake";
 import type { Provider } from "./types";
+
+export type ProviderOperation = Exclude<Operation, "verify"> | "review" | "propose";
 
 export function buildProvider(config: NightcrewConfig, projectRoot: string): Provider {
   if (config.provider.default === "fake") {
@@ -16,7 +18,15 @@ export function buildProvider(config: NightcrewConfig, projectRoot: string): Pro
   return new CodexProvider({
     sandbox: config.provider.codex.sandbox,
     networkAccess: config.provider.codex.networkAccess,
+    webSearchMode: config.provider.codex.webSearch,
   });
+}
+
+export function webSearchModeFor(
+  config: NightcrewConfig,
+  operation: ProviderOperation,
+): CodexWebSearchMode {
+  return config.provider.codex.webSearchOverrides[operation] ?? config.provider.codex.webSearch;
 }
 
 export function tierFor(config: NightcrewConfig, operation: Operation): ModelTier {

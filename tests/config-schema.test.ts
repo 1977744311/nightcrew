@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { configSchema } from "../src/config/schema";
+import { webSearchModeFor } from "../src/providers/factory";
 
 describe("config schema", () => {
   it("applies defaults on a minimal config", () => {
@@ -7,6 +8,8 @@ describe("config schema", () => {
     expect(config.version).toBe(1);
     expect(config.provider.default).toBe("codex");
     expect(config.provider.codex.sandbox).toBe("workspace-write");
+    expect(config.provider.codex.webSearch).toBe("cached");
+    expect(config.provider.codex.webSearchOverrides).toEqual({});
     expect(config.routing).toEqual({
       plan: "light",
       execute: "heavy",
@@ -29,6 +32,40 @@ describe("config schema", () => {
   it("rejects unknown keys loudly", () => {
     expect(() =>
       configSchema.parse({ project: { name: "demo" }, loop: { maxFailureStrek: 5 } }),
+    ).toThrow();
+  });
+
+  it("parses Codex web-search modes and resolves operation overrides", () => {
+    const config = configSchema.parse({
+      project: { name: "demo" },
+      provider: {
+        codex: {
+          webSearch: "cached",
+          webSearchOverrides: {
+            propose: "live",
+            execute: "disabled",
+          },
+        },
+      },
+    });
+
+    expect(webSearchModeFor(config, "propose")).toBe("live");
+    expect(webSearchModeFor(config, "execute")).toBe("disabled");
+    expect(webSearchModeFor(config, "review")).toBe("cached");
+  });
+
+  it("rejects invalid Codex web-search modes and override keys", () => {
+    expect(() =>
+      configSchema.parse({
+        project: { name: "demo" },
+        provider: { codex: { webSearch: "online" } },
+      }),
+    ).toThrow();
+    expect(() =>
+      configSchema.parse({
+        project: { name: "demo" },
+        provider: { codex: { webSearchOverrides: { proposee: "live" } } },
+      }),
     ).toThrow();
   });
 

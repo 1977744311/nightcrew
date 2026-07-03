@@ -9,10 +9,10 @@ parallel: false
 Close the Codex provider web-search seam by making the SDK search mode explicit in config, overridable for proposal generation, and reflected in proposal research prompts when outside ecosystem context matters; this is the only remaining authorized backlog item not already covered by an existing plan.
 
 ## Acceptance
-- [ ] `provider.codex.webSearch` accepts `disabled`, `cached`, or `live`, defaults to `cached`, and existing configs continue to parse.
-- [ ] Per-operation web-search overrides resolve at least for `propose`, and the Codex adapter passes the resolved value as SDK `ThreadOptions.webSearchMode` without changing the fake provider contract.
-- [ ] Proposal research prompts instruct external-ecosystem goals to search first and cite 1-2 references in candidate rationales while preserving the structured output contract.
-- [ ] Tests cover config parsing/defaults, override resolution, adapter option passing, prompt guidance, and the `CHANGELOG.md` Unreleased entry.
+- [x] `provider.codex.webSearch` accepts `disabled`, `cached`, or `live`, defaults to `cached`, and existing configs continue to parse.
+- [x] Per-operation web-search overrides resolve at least for `propose`, and the Codex adapter passes the resolved value as SDK `ThreadOptions.webSearchMode` without changing the fake provider contract.
+- [x] Proposal research prompts instruct external-ecosystem goals to search first and cite 1-2 references in candidate rationales while preserving the structured output contract.
+- [x] Tests cover config parsing/defaults, override resolution, adapter option passing, prompt guidance, and the `CHANGELOG.md` Unreleased entry.
 
 ## Steps
 1. Inspect the config schema, Codex adapter thread option construction, proposal prompt builder, and existing tests around provider routing.
