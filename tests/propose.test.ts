@@ -5,7 +5,11 @@ import { runCli } from "../src/cli/program";
 import { renderProposalItemPreview } from "../src/cli/proposal-selection";
 import { reviewProposal, runPropose } from "../src/cli/propose";
 import { createProposalProgressReporter } from "../src/cli/propose-progress";
-import { generateProposal, type ProposalProgressEvent } from "../src/proposals/generate";
+import {
+  generateProposal,
+  type ProposalProgressEvent,
+  refineProposal,
+} from "../src/proposals/generate";
 import {
   listPendingProposals,
   type ProposalLens,
@@ -402,6 +406,87 @@ describe("nightcrew propose", () => {
       "cite 1-2 reference sources inside that candidate's `rationale` field",
     );
     expect(runs[0]?.prompt).toContain("do not add fields or change the JSON output shape");
+  });
+
+  it("instructs proposal passes to mirror the goal language while keeping BACKLOG formatting", async () => {
+    project = await makeTempProject();
+    const prompts: string[] = [];
+    const provider: Provider = {
+      name: "capture",
+      run: async (options) => {
+        prompts.push(options.prompt);
+        const lens = lensFromPrompt(options.prompt);
+        return proposalRunResult(lens, `Language ${prompts.length}`);
+      },
+    };
+
+    await generateProposal({
+      goal: "Add language mirroring to proposals",
+      root: project.root,
+      paths: project.ctx().paths,
+      config: project.ctx().config,
+      provider,
+    });
+
+    expect(prompts).toHaveLength(3);
+    expect(prompts.map(lensFromPrompt)).toEqual([
+      "minimal_path",
+      "architecture_first",
+      "risk_first",
+    ]);
+    for (const prompt of prompts) {
+      expect(prompt).toContain("## Language");
+      expect(prompt).toContain(
+        "- Write every candidate `title`, `body`, and `rationale` in the same language as the operator goal text.",
+      );
+      expect(prompt).toContain(
+        "- Preserve the BACKLOG checkbox formatting rules below regardless of language.",
+      );
+    }
+  });
+
+  it("instructs refinement passes to mirror the feedback language while keeping BACKLOG formatting", async () => {
+    project = await makeTempProject();
+    const source = writeProposalArtifact(project.ctx().paths, {
+      goal: "Improve proposal wording",
+      routingTier: "light",
+      passes: [],
+      items: [{ ...candidate("Source minimal", "source minimal"), lens: "minimal_path" }],
+    });
+    const prompts: string[] = [];
+    const provider: Provider = {
+      name: "capture",
+      run: async (options) => {
+        prompts.push(options.prompt);
+        const lens = lensFromPrompt(options.prompt);
+        return proposalRunResult(lens, `Refined language ${prompts.length}`);
+      },
+    };
+
+    await refineProposal({
+      source,
+      feedback: "Follow the feedback language for regenerated candidates.",
+      root: project.root,
+      paths: project.ctx().paths,
+      config: project.ctx().config,
+      provider,
+    });
+
+    expect(prompts).toHaveLength(3);
+    expect(prompts.map(lensFromPrompt)).toEqual([
+      "minimal_path",
+      "architecture_first",
+      "risk_first",
+    ]);
+    for (const prompt of prompts) {
+      expect(prompt).toContain("## Language");
+      expect(prompt).toContain(
+        "- Write every candidate `title`, `body`, and `rationale` in the same language as the operator feedback.",
+      );
+      expect(prompt).toContain(
+        "- Preserve the BACKLOG checkbox formatting rules below regardless of language.",
+      );
+    }
   });
 
   it("selects generated proposal items through the interactive helper and archives the artifact", async () => {

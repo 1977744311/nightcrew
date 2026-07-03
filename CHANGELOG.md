@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Proposal generation and refinement prompts now ask candidate titles, bodies,
+  and rationales to mirror the operator goal or feedback language while keeping
+  BACKLOG checkbox formatting intact.
 - `nightcrew propose` now runs the minimal, architecture, and risk proposal
   passes concurrently while keeping candidate numbering stable in lens order;
   TTY runs show live per-lens status lines, and non-TTY runs print plain
