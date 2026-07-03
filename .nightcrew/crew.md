@@ -74,18 +74,18 @@ an empty backlog means the crew idles instead of inventing work.
       actions the list renders read-only and the endpoint returns 404. Tests
       included.
 
-- [ ] Console project detail per-plan accounting: extract report-style plan history aggregation into a shared module that returns plan id, title, iterations, total tokens, durationMs, and landed/pending status.
+- [x] Console project detail per-plan accounting: extract report-style plan history aggregation into a shared module that returns plan id, title, iterations, total tokens, durationMs, and landed/pending status.
       Use that model from `nightcrew report` and `src/console/data.ts` so the project detail JSON exposes a stable per-plan metrics field instead of page-only aggregation.
       Render a per-plan table on the console project detail page with token totals and human-readable duration while preserving the existing summary, proposals, token curve, and history table.
       Tests included for aggregation, console detail JSON, and the HTML rendering path.
-- [ ] Proposal picker must show full item bodies: in TTY flows (after
+- [x] Proposal picker must show full item bodies: in TTY flows (after
       generation and in `propose review`), print every candidate — id,
       title, lens, and the full backlog body — BEFORE opening the checkbox
       picker, so the operator reads the exact text they are approving.
       Keep picker option labels short (id + title, lens as hint) and the
       non-TTY output unchanged. Test the pre-picker printing through the
       injectable prompt seam. Tests included.
-- [ ] `nightcrew propose refine`: feedback-and-regenerate for proposals.
+- [x] `nightcrew propose refine`: feedback-and-regenerate for proposals.
       Non-interactive: `nightcrew propose refine [<id-or-file>] --feedback
       "<text>"` (default: latest pending). Interactive: when the TTY picker
       closes with zero selections, prompt once for optional feedback text;
@@ -98,7 +98,7 @@ an empty backlog means the crew idles instead of inventing work.
       Fake-provider tests cover: feedback present in rerun prompts, lineage
       fields, source archived, and the zero-selection/no-feedback path
       changing nothing. Tests included.
-- [ ] Web search support: add `provider.codex.webSearch` config
+- [x] Web search support: add `provider.codex.webSearch` config
       (`disabled | cached | live`, default `cached` to match current SDK
       behavior) and pass it to the SDK ThreadOptions as `webSearchMode`;
       allow an optional per-operation override map (at minimum `propose`

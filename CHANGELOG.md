@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.3.0
+
+The research release: proposals you can actually read, refine, and source.
+Four plans, one unattended run, built by nightcrew on itself.
 
 - Added Codex web-search controls: `provider.codex.webSearch` defaults to
   `cached`, `provider.codex.webSearchOverrides` can override operations such as
