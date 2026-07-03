@@ -392,6 +392,27 @@
       },
       "additionalProperties": false
     },
+    "notify": {
+      "default": {
+        "events": ["loop_stopped", "open_question", "proposal_landed"]
+      },
+      "type": "object",
+      "properties": {
+        "webhook": {
+          "type": "string",
+          "format": "uri"
+        },
+        "events": {
+          "default": ["loop_stopped", "open_question", "proposal_landed"],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["loop_stopped", "open_question", "proposal_landed"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "protectedPaths": {
       "default": [".nightcrew/config.yaml", ".nightcrew/crew.md"],
       "type": "array",

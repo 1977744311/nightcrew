@@ -21,6 +21,8 @@ export type VerifyProfile = z.infer<typeof verifyProfileSchema>;
 
 const tierSchema = z.enum(["light", "heavy"]);
 const webSearchModeSchema = z.enum(["disabled", "cached", "live"]);
+export const NOTIFY_EVENTS = ["loop_stopped", "open_question", "proposal_landed"] as const;
+const notifyEventSchema = z.enum(NOTIFY_EVENTS);
 const codexWebSearchOverridesSchema = z
   .strictObject({
     plan: webSearchModeSchema.optional(),
@@ -153,6 +155,14 @@ export const configSchema = z.strictObject({
       policy: z.enum(["auto", "branch"]).default("auto"),
     })
     .default({ policy: "auto" }),
+  notify: z
+    .strictObject({
+      /** Webhook URL for deterministic runtime notifications. Unset disables delivery. */
+      webhook: z.string().url().optional(),
+      /** Notification event filter. Empty means deliver no events. */
+      events: z.array(notifyEventSchema).default([...NOTIFY_EVENTS]),
+    })
+    .default({ events: [...NOTIFY_EVENTS] }),
   /** Paths (repo-relative) the agent must never modify. `.git` is always protected. */
   protectedPaths: z
     .array(z.string().min(1))
@@ -172,3 +182,4 @@ export const configSchema = z.strictObject({
 export type NightcrewConfig = z.infer<typeof configSchema>;
 export type NightcrewConfigInput = z.input<typeof configSchema>;
 export type CodexWebSearchMode = z.infer<typeof webSearchModeSchema>;
+export type NotifyEvent = z.infer<typeof notifyEventSchema>;
