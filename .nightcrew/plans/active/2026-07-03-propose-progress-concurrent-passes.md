@@ -9,9 +9,9 @@ parallel: false
 Close the silent propose-generation seam by running the three independent read-only research lenses concurrently while surfacing live per-lens progress, so operators see work advancing without changing proposal candidate ordering or failure behavior.
 
 ## Acceptance
-- [ ] `nightcrew propose` starts the minimal, architecture, and risk lens passes concurrently and still numbers candidates in fixed lens order: minimal, architecture, risk.
-- [ ] TTY output shows one live status line per lens, and non-TTY output prints plain start and finish or failure lines.
-- [ ] Any failed lens still fails the whole command, with tests covering out-of-order completion and the failure path.
+- [x] `nightcrew propose` starts the minimal, architecture, and risk lens passes concurrently and still numbers candidates in fixed lens order: minimal, architecture, risk.
+- [x] TTY output shows one live status line per lens, and non-TTY output prints plain start and finish or failure lines.
+- [x] Any failed lens still fails the whole command, with tests covering out-of-order completion and the failure path.
 
 ## Steps
 1. Locate the proposal generation pipeline, lens pass orchestration, and existing TTY/non-TTY output seams.
