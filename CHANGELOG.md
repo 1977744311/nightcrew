@@ -6,6 +6,9 @@
   passes concurrently while keeping candidate numbering stable in lens order;
   TTY runs show live per-lens status lines, and non-TTY runs print plain
   start, completion, and failure lines.
+- TTY proposal approval now uses an inline preview picker that shows the
+  highlighted candidate's full body, source lens, and rationale without
+  pre-printing the full candidate list.
 
 ## 1.3.0
 
