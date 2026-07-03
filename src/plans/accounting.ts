@@ -31,10 +31,7 @@ export function aggregatePlanHistory(
   history: IterationRecord[],
 ): PlanHistoryMetric[] {
   const titles = planTitleIndex(ctx);
-  const plans = new Map<
-    string,
-    Omit<PlanHistoryMetric, "totalTokens" | "status">
-  >();
+  const plans = new Map<string, Omit<PlanHistoryMetric, "totalTokens" | "status">>();
 
   for (const record of history) {
     if (!record.planId) continue;
