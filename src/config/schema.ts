@@ -21,6 +21,7 @@ export type VerifyProfile = z.infer<typeof verifyProfileSchema>;
 
 const tierSchema = z.enum(["light", "heavy"]);
 const webSearchModeSchema = z.enum(["disabled", "cached", "live"]);
+const gitMergeModeSchema = z.enum(["merge", "pr"]);
 export const NOTIFY_EVENTS = ["loop_stopped", "open_question", "proposal_landed"] as const;
 const notifyEventSchema = z.enum(NOTIFY_EVENTS);
 const codexWebSearchOverridesSchema = z
@@ -149,6 +150,12 @@ export const configSchema = z.strictObject({
       maxTokensPerIteration: z.number().int().positive().optional(),
     })
     .default({ quotaWindowHours: 5 }),
+  git: z
+    .strictObject({
+      /** merge: land locally into base. pr: push the plan branch and open a GitHub PR. */
+      mergeMode: gitMergeModeSchema.default("merge"),
+    })
+    .default({ mergeMode: "merge" }),
   merge: z
     .strictObject({
       /** auto: merge into base when gates are green. branch: leave the branch. */

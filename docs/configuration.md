@@ -63,6 +63,9 @@ budget:
   quotaWindowHours: 5               # quota_exhausted schedules resume on this cadence
   maxTokensPerIteration: 500000     # optional; over-budget iterations get flagged
 
+git:
+  mergeMode: merge                  # merge: local merge | pr: push branch and open a GitHub PR
+
 merge:
   policy: auto                      # auto: merge when green | branch: leave for a PR
 
@@ -75,6 +78,12 @@ schedule:                           # used by `crew start` (and `--now` to ignor
   days: [0, 1, 2, 3, 4, 5, 6]       # 0 = Sunday; unset = every day
   idleCooldownMs: 300000            # nap after an idle stop before re-checking BACKLOG
 ```
+
+`git.mergeMode: pr` keeps the normal verify and review gates, then pushes the
+plan branch as `nightcrew/<plan-id>` and runs `gh pr create --base <baseBranch>`
+instead of merging locally. `nightcrew doctor` requires the `gh` executable only
+when PR mode is configured. `merge.policy: branch` remains the manual fallback:
+it leaves the reviewed branch for a human and does not open a PR.
 
 ## Plan frontmatter
 

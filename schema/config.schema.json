@@ -378,6 +378,20 @@
       },
       "additionalProperties": false
     },
+    "git": {
+      "default": {
+        "mergeMode": "merge"
+      },
+      "type": "object",
+      "properties": {
+        "mergeMode": {
+          "default": "merge",
+          "type": "string",
+          "enum": ["merge", "pr"]
+        }
+      },
+      "additionalProperties": false
+    },
     "merge": {
       "default": {
         "policy": "auto"

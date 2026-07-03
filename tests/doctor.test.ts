@@ -180,6 +180,41 @@ describe("nightcrew doctor", () => {
     expect(renderDoctorReport(missingReport)).toContain("FAIL");
   });
 
+  it("requires gh only when PR merge mode is configured", async () => {
+    project = await makeTempProject(healthyConfig());
+
+    const defaultReport = await runDoctorChecks(project.root, {
+      gh: async () => {
+        throw new Error("gh should not be checked in default merge mode");
+      },
+    });
+    expect(defaultReport.ok).toBe(true);
+    expect(defaultReport.checks.some((check) => check.name === "gh executable")).toBe(false);
+
+    project.setConfig({
+      ...healthyConfig(),
+      git: { mergeMode: "pr" },
+    });
+
+    const prReport = await runDoctorChecks(project.root, {
+      gh: async () => ({ ok: true, code: 0, stdout: "gh version 2.0.0\n", stderr: "" }),
+    });
+    expect(prReport.ok).toBe(true);
+    expect(prReport.checks.find((check) => check.name === "gh executable")).toMatchObject({
+      ok: true,
+      status: "pass",
+    });
+
+    const missingReport = await runDoctorChecks(project.root, {
+      gh: async () => ({ ok: false, code: 127, stdout: "", stderr: "spawn gh ENOENT" }),
+    });
+    expect(missingReport.ok).toBe(false);
+    expect(missingReport.checks.find((check) => check.name === "gh executable")).toMatchObject({
+      ok: false,
+      status: "fail",
+    });
+  });
+
   it("sets the CLI exit code from the report and prints the table", async () => {
     project = await makeTempProject(healthyConfig());
 

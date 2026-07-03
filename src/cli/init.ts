@@ -58,6 +58,9 @@ verify:
 #   mode: advisory          # off | advisory | gate
 #   maxReviewRounds: 2
 
+# git:
+#   mergeMode: merge        # merge: local merge | pr: push branch and open a GitHub PR
+
 # merge:
 #   policy: auto            # auto: land green plans onto base | branch: leave for manual merge
 
