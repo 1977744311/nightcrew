@@ -14,7 +14,7 @@ import { acquireProjectLock, lockHolder } from "../state/lock";
 import { updateState } from "../state/state";
 import { renderDoctorReport, runDoctorChecks } from "./doctor";
 import { initProject } from "./init";
-import { printProposalList, runPropose, selectProposal } from "./propose";
+import { printProposalList, reviewProposal, runPropose, selectProposal } from "./propose";
 import { printStatus } from "./status";
 
 function rootOf(options: { root?: string }): string {
@@ -237,6 +237,24 @@ export function buildProgram(): Command {
     .action(async (options: { root?: string }, command: Command) => {
       printProposalList(loadProject(rootOption(options, command)));
     });
+  propose
+    .command("review")
+    .description("review a pending proposal artifact")
+    .argument("[file]", "proposal id or JSON file (default: latest pending)")
+    .option("--latest", "review the latest pending proposal")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(
+      async (
+        file: string | undefined,
+        options: { latest?: boolean; root?: string },
+        command: Command,
+      ) => {
+        await reviewProposal(loadProject(rootOption(options, command)), {
+          file,
+          latest: options.latest,
+        });
+      },
+    );
   propose
     .command("select")
     .description("append selected proposal items to BACKLOG and archive the artifact")

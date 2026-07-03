@@ -183,6 +183,17 @@ export function latestPendingProposal(paths: ProjectPaths): ProposalArtifactFile
   return proposals.at(-1) ?? null;
 }
 
+export function loadProposalArtifact(
+  paths: ProjectPaths,
+  proposalIdOrFile?: string,
+): ProposalArtifactFile {
+  const artifact = proposalIdOrFile
+    ? resolveProposal(paths, proposalIdOrFile)
+    : latestPendingProposal(paths);
+  if (!artifact) throw new Error("no pending proposals");
+  return artifact;
+}
+
 export function parseProposalIds(value: string): string[] {
   const ids = value
     .split(",")
@@ -249,10 +260,7 @@ export function selectProposalItems(
   paths: ProjectPaths,
   input: SelectProposalInput,
 ): SelectProposalResult {
-  const artifact = input.proposalIdOrFile
-    ? resolveProposal(paths, input.proposalIdOrFile)
-    : latestPendingProposal(paths);
-  if (!artifact) throw new Error("no pending proposals");
+  const artifact = loadProposalArtifact(paths, input.proposalIdOrFile);
 
   const selectedItems = selectItems(artifact.proposal, input.ids);
   const crew = readFileSync(paths.crewFile, "utf8");
