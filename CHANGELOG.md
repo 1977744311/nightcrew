@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- TTY proposal review now prints each candidate's id, title, source lens, and
+  full backlog body before opening the checkbox picker while preserving the
+  existing non-TTY proposal output.
 - Added shared per-plan history accounting and surfaced those metrics in the
   console project detail JSON and page while keeping `nightcrew report`
   summary behavior stable.
