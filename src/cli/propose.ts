@@ -1,7 +1,7 @@
 import { relative } from "node:path";
 import pc from "picocolors";
 import type { ProjectContext } from "../config/load";
-import { generateProposal } from "../proposals/generate";
+import { generateProposal, refineProposal } from "../proposals/generate";
 import {
   listPendingProposals,
   loadProposalArtifact,
@@ -11,10 +11,32 @@ import {
 import { buildProvider } from "../providers/factory";
 import {
   type ProposalSelectionOptions,
+  printProposalArchive,
   printProposalHeader,
   printProposalSelectionResult,
   reviewProposalSelection,
 } from "./proposal-selection";
+
+function withFeedbackRefinement(
+  ctx: ProjectContext,
+  existingProvider?: ReturnType<typeof buildProvider>,
+): ProposalSelectionOptions["refineOnEmpty"] {
+  let provider = existingProvider;
+  return async (artifact, feedback) => {
+    provider ??= buildProvider(ctx.config, ctx.root);
+    const result = await refineProposal({
+      source: artifact,
+      feedback,
+      root: ctx.root,
+      paths: ctx.paths,
+      config: ctx.config,
+      provider,
+    });
+    printProposalHeader(ctx, result.artifact, "refined");
+    printProposalArchive(ctx, result.archivedFile);
+    return result.artifact;
+  };
+}
 
 export async function runPropose(
   ctx: ProjectContext,
@@ -30,7 +52,10 @@ export async function runPropose(
     provider,
   });
   printProposalHeader(ctx, artifact, "created");
-  await reviewProposalSelection(ctx, artifact, options);
+  await reviewProposalSelection(ctx, artifact, {
+    refineOnEmpty: withFeedbackRefinement(ctx, provider),
+    ...options,
+  });
 }
 
 export function printProposalList(ctx: ProjectContext): void {
@@ -65,6 +90,33 @@ export async function reviewProposal(
   printProposalHeader(ctx, artifact, "reviewing");
   await reviewProposalSelection(ctx, artifact, {
     includeProposalHint: true,
+    refineOnEmpty: withFeedbackRefinement(ctx),
+    ...selectionOptions,
+  });
+}
+
+export async function refineStoredProposal(
+  ctx: ProjectContext,
+  options: { file?: string; feedback: string },
+  selectionOptions: ProposalSelectionOptions = {},
+): Promise<void> {
+  const feedback = options.feedback.trim();
+  if (!feedback) throw new Error("--feedback must not be empty");
+  const source = loadProposalArtifact(ctx.paths, options.file);
+  const provider = buildProvider(ctx.config, ctx.root);
+  const result = await refineProposal({
+    source,
+    feedback,
+    root: ctx.root,
+    paths: ctx.paths,
+    config: ctx.config,
+    provider,
+  });
+  printProposalHeader(ctx, result.artifact, "refined");
+  printProposalArchive(ctx, result.archivedFile);
+  await reviewProposalSelection(ctx, result.artifact, {
+    includeProposalHint: true,
+    refineOnEmpty: withFeedbackRefinement(ctx, provider),
     ...selectionOptions,
   });
 }

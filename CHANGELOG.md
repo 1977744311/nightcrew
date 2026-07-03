@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added `nightcrew propose refine [<id-or-file>] --feedback <text>` plus TTY
+  zero-selection feedback refinement, preserving source lineage and archiving
+  superseded proposal artifacts.
 - TTY proposal review now prints each candidate's id, title, source lens, and
   full backlog body before opening the checkbox picker while preserving the
   existing non-TTY proposal output.

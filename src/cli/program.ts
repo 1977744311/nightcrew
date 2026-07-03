@@ -14,7 +14,13 @@ import { acquireProjectLock, lockHolder } from "../state/lock";
 import { updateState } from "../state/state";
 import { renderDoctorReport, runDoctorChecks } from "./doctor";
 import { initProject } from "./init";
-import { printProposalList, reviewProposal, runPropose, selectProposal } from "./propose";
+import {
+  printProposalList,
+  refineStoredProposal,
+  reviewProposal,
+  runPropose,
+  selectProposal,
+} from "./propose";
 import { printStatus } from "./status";
 
 function rootOf(options: { root?: string }): string {
@@ -252,6 +258,24 @@ export function buildProgram(): Command {
         await reviewProposal(loadProject(rootOption(options, command)), {
           file,
           latest: options.latest,
+        });
+      },
+    );
+  propose
+    .command("refine")
+    .description("regenerate a pending proposal from operator feedback")
+    .argument("[file]", "proposal id or JSON file (default: latest pending)")
+    .requiredOption("--feedback <text>", "operator feedback to include in the refinement passes")
+    .option("--root <dir>", "project root (default: cwd)")
+    .action(
+      async (
+        file: string | undefined,
+        options: { feedback: string; root?: string },
+        command: Command,
+      ) => {
+        await refineStoredProposal(loadProject(rootOption(options, command)), {
+          file,
+          feedback: options.feedback,
         });
       },
     );

@@ -33,7 +33,13 @@ export {
   type PlanMetricStatus,
 } from "./plans/accounting";
 export { findPlan, listPlans, parsePlanFile, validatePlan } from "./plans/plans";
-export { generateProposal, PROPOSAL_OUTPUT_SCHEMA } from "./proposals/generate";
+export {
+  generateProposal,
+  PROPOSAL_OUTPUT_SCHEMA,
+  type RefineProposalOptions,
+  type RefineProposalResult,
+  refineProposal,
+} from "./proposals/generate";
 export {
   appendItemsToBacklog,
   archiveProposal,
@@ -41,6 +47,7 @@ export {
   type CandidateProposalItem,
   latestPendingProposal,
   listPendingProposals,
+  nextRefinedProposalId,
   PROPOSAL_ARTIFACT_VERSION,
   PROPOSAL_LENSES,
   type ProposalArtifact,

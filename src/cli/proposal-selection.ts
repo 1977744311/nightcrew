@@ -1,5 +1,5 @@
 import { relative } from "node:path";
-import { isCancel, multiselect } from "@clack/prompts";
+import { isCancel, multiselect, text } from "@clack/prompts";
 import pc from "picocolors";
 import type { ProjectContext } from "../config/load";
 import {
@@ -11,10 +11,17 @@ import {
 } from "../proposals/proposals";
 
 export type ProposalPrompt = (proposal: ProposalArtifact) => Promise<string[] | symbol>;
+export type ProposalFeedbackPrompt = (proposal: ProposalArtifact) => Promise<string | symbol>;
+export type ProposalRefineHandler = (
+  artifact: ProposalArtifactFile,
+  feedback: string,
+) => Promise<ProposalArtifactFile>;
 
 export interface ProposalSelectionOptions {
   isTty?: boolean;
   prompt?: ProposalPrompt;
+  feedbackPrompt?: ProposalFeedbackPrompt;
+  refineOnEmpty?: ProposalRefineHandler;
   includeProposalHint?: boolean;
 }
 
@@ -27,13 +34,18 @@ export interface ProposalSelectionOutcome {
 export function printProposalHeader(
   ctx: ProjectContext,
   artifact: ProposalArtifactFile,
-  label: "created" | "reviewing",
+  label: "created" | "reviewing" | "refined",
 ): void {
   const rel = relative(ctx.root, artifact.file).replaceAll("\\", "/");
-  console.log(`${label === "created" ? pc.green(label) : pc.cyan(label)} ${rel}`);
+  console.log(`${label === "reviewing" ? pc.cyan(label) : pc.green(label)} ${rel}`);
   console.log(
     `${artifact.proposal.items.length} candidate${artifact.proposal.items.length === 1 ? "" : "s"}`,
   );
+}
+
+export function printProposalArchive(ctx: ProjectContext, archivedFile: string): void {
+  const archiveRel = relative(ctx.root, archivedFile).replaceAll("\\", "/");
+  console.log(`${pc.dim("archived")} ${archiveRel}`);
 }
 
 export function printProposalItems(proposal: ProposalArtifact): void {
@@ -72,7 +84,7 @@ export function printProposalSelectionResult(
   console.log(`${pc.dim("archived")} ${archiveRel}`);
 }
 
-async function promptProposalIds(proposal: ProposalArtifact): Promise<string[]> {
+async function promptProposalIds(proposal: ProposalArtifact): Promise<string[] | symbol> {
   const selected = await multiselect<string>({
     message: "Select proposal items to append to BACKLOG",
     options: proposal.items.map((item) => ({
@@ -82,8 +94,15 @@ async function promptProposalIds(proposal: ProposalArtifact): Promise<string[]> 
     })),
     required: false,
   });
-  if (isCancel(selected)) return [];
+  if (isCancel(selected)) return selected;
   return selected;
+}
+
+async function promptProposalFeedback(proposal: ProposalArtifact): Promise<string | symbol> {
+  return await text({
+    message: `Optional feedback for ${proposal.id}`,
+    placeholder: "Leave blank to keep this proposal pending",
+  });
 }
 
 export async function reviewProposalSelection(
@@ -100,7 +119,20 @@ export async function reviewProposalSelection(
 
   printProposalPromptDetails(artifact.proposal);
   const picked = await (options.prompt ?? promptProposalIds)(artifact.proposal);
-  if (isCancel(picked) || picked.length === 0) {
+  if (isCancel(picked) || !Array.isArray(picked)) {
+    console.log(pc.dim("no items selected; proposal left pending"));
+    return { mode: "interactive", selectedItems: [] };
+  }
+  if (picked.length === 0) {
+    const feedback = options.refineOnEmpty
+      ? await (options.feedbackPrompt ?? promptProposalFeedback)(artifact.proposal)
+      : "";
+    if (!isCancel(feedback) && typeof feedback === "string" && feedback.trim()) {
+      const refined = await options.refineOnEmpty?.(artifact, feedback.trim());
+      if (refined) {
+        return await reviewProposalSelection(ctx, refined, options);
+      }
+    }
     console.log(pc.dim("no items selected; proposal left pending"));
     return { mode: "interactive", selectedItems: [] };
   }

@@ -39,6 +39,8 @@ export const proposalArtifactSchema = z.strictObject({
   status: z.literal("pending"),
   createdAt: z.string().min(1),
   routingTier: z.enum(["light", "heavy"]),
+  refinedFrom: z.string().min(1).optional(),
+  feedback: z.string().min(1).optional(),
   items: z.array(proposalItemSchema),
   passes: z.array(proposalPassSchema),
 });
@@ -64,6 +66,9 @@ export interface WriteProposalArtifactInput {
   routingTier: ModelTier;
   items: CandidateProposalItem[];
   passes: Array<{ lens: ProposalLens; sessionId: string | null; usage: TokenUsage | null }>;
+  id?: string;
+  refinedFrom?: string;
+  feedback?: string;
   now?: Date;
 }
 
@@ -87,6 +92,17 @@ function proposalIdForGoal(goal: string, now = new Date()): string {
 
 function proposalFile(paths: ProjectPaths, id: string): string {
   return join(paths.proposalsDir, `${id}.json`);
+}
+
+export function nextRefinedProposalId(paths: ProjectPaths, sourceId: string): string {
+  const base = `${sourceId}-refined`;
+  let id = base;
+  let suffix = 2;
+  while (existsSync(proposalFile(paths, id))) {
+    id = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  return id;
 }
 
 function cleanBody(body: string): string {
@@ -129,17 +145,20 @@ function stableItems(items: CandidateProposalItem[]): ProposalItem[] {
 export function buildProposalArtifact(input: WriteProposalArtifactInput): ProposalArtifact {
   const goal = input.goal.trim();
   if (!goal) throw new Error("proposal goal is required");
+  const feedback = input.feedback?.trim();
   const now = input.now ?? new Date();
-  const artifact: ProposalArtifact = {
+  const artifact = {
     version: PROPOSAL_ARTIFACT_VERSION,
-    id: proposalIdForGoal(goal, now),
+    id: input.id ?? proposalIdForGoal(goal, now),
     goal,
     status: "pending",
     createdAt: isoNow(),
     routingTier: input.routingTier,
+    ...(input.refinedFrom ? { refinedFrom: input.refinedFrom } : {}),
+    ...(feedback ? { feedback } : {}),
     items: stableItems(input.items),
     passes: input.passes,
-  };
+  } satisfies ProposalArtifact;
   return proposalArtifactSchema.parse(artifact);
 }
 

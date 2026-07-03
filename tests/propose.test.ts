@@ -53,6 +53,10 @@ function candidate(title: string, lens: string) {
   };
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function proposalScriptEntries(model: string) {
   return [
     {
@@ -75,6 +79,41 @@ function proposalScriptEntries(model: string) {
       requireOutputSchema: true,
       expectReadOnly: true,
       expectModel: model,
+    },
+  ];
+}
+
+function refinementScriptEntries(input: {
+  model: string;
+  feedback: string;
+  previousTitle: string;
+}) {
+  const feedback = escapeRegex(input.feedback);
+  const previousTitle = escapeRegex(input.previousTitle);
+  const previousSummary = `Previous candidate summaries:.*1\\. ${previousTitle} \\[minimal_path\\]`;
+  return [
+    {
+      match: `(?=.*minimal path)(?=.*${previousSummary})(?=.*Operator feedback:.*${feedback})`,
+      structuredOutput: { candidates: [candidate("Refined minimal", "refined minimal")] },
+      requireOutputSchema: true,
+      expectReadOnly: true,
+      expectModel: input.model,
+    },
+    {
+      match: `(?=.*architecture-first)(?=.*${previousSummary})(?=.*Operator feedback:.*${feedback})`,
+      structuredOutput: {
+        candidates: [candidate("Refined architecture", "refined architecture")],
+      },
+      requireOutputSchema: true,
+      expectReadOnly: true,
+      expectModel: input.model,
+    },
+    {
+      match: `(?=.*risk-first)(?=.*${previousSummary})(?=.*Operator feedback:.*${feedback})`,
+      structuredOutput: { candidates: [candidate("Refined risk", "refined risk")] },
+      requireOutputSchema: true,
+      expectReadOnly: true,
+      expectModel: input.model,
     },
   ];
 }
@@ -186,6 +225,144 @@ describe("nightcrew propose", () => {
     expect(existsSync(archived)).toBe(true);
   });
 
+  it("refines the latest pending proposal with feedback and archives the source", async () => {
+    project = await makeTempProject();
+    project.setConfig({
+      provider: {
+        default: "fake",
+        fake: { script: project.scriptFile },
+        codex: { tiers: { light: "proposal-light" } },
+      },
+    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-03T09:45:00.000Z"));
+    const older = writeProposalArtifact(project.ctx().paths, {
+      goal: "A older proposal",
+      routingTier: "light",
+      passes: [],
+      items: [{ ...candidate("Older minimal", "older"), lens: "minimal_path" }],
+    });
+    const latest = writeProposalArtifact(project.ctx().paths, {
+      goal: "Z latest proposal",
+      routingTier: "light",
+      passes: [],
+      items: [
+        { ...candidate("Source minimal", "source minimal"), lens: "minimal_path" },
+        { ...candidate("Source architecture", "source architecture"), lens: "architecture_first" },
+      ],
+    });
+    const feedback = "Keep the implementation smaller and preserve lineage.";
+    project.setScript(
+      refinementScriptEntries({
+        model: "proposal-light",
+        feedback,
+        previousTitle: "Source minimal",
+      }),
+    );
+
+    const output = await captureConsole(() =>
+      runCli(["propose", "refine", "--feedback", feedback, "--root", project?.root ?? ""]),
+    );
+
+    const refinedFile = join(
+      project.root,
+      ".nightcrew/proposals",
+      `${latest.proposal.id}-refined.json`,
+    );
+    const archivedSource = join(
+      project.ctx().paths.archivedProposalsDir,
+      `${latest.proposal.id}.json`,
+    );
+    const refined = readProposalArtifact(refinedFile);
+    expect(output.stderr).toBe("");
+    expect(output.stdout).toContain(
+      `refined .nightcrew/proposals/${latest.proposal.id}-refined.json`,
+    );
+    expect(output.stdout).toContain(
+      `archived .nightcrew/proposals/archive/${latest.proposal.id}.json`,
+    );
+    expect(output.stdout).toContain("1. Refined minimal");
+    expect(output.stdout).toContain(
+      `select with: nightcrew propose select --ids 1,3 --proposal ${latest.proposal.id}-refined`,
+    );
+    expect(refined).toMatchObject({
+      id: `${latest.proposal.id}-refined`,
+      goal: latest.proposal.goal,
+      status: "pending",
+      routingTier: "light",
+      refinedFrom: latest.proposal.id,
+      feedback,
+    });
+    expect(refined.items.map((item) => item.lens)).toEqual([
+      "minimal_path",
+      "architecture_first",
+      "risk_first",
+    ]);
+    expect(refined.passes).toHaveLength(3);
+    expect(existsSync(older.file)).toBe(true);
+    expect(existsSync(latest.file)).toBe(false);
+    expect(existsSync(archivedSource)).toBe(true);
+    expect(existsSync(refinedFile)).toBe(true);
+  });
+
+  it("prompts for feedback on zero TTY selections, refines, and reopens the picker", async () => {
+    project = await makeTempProject();
+    project.setConfig({
+      provider: {
+        default: "fake",
+        fake: { script: project.scriptFile },
+        codex: { tiers: { light: "proposal-light" } },
+      },
+    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-03T09:50:00.000Z"));
+    const { file, proposal } = writeProposalArtifact(project.ctx().paths, {
+      goal: "Retry proposal feedback",
+      routingTier: "light",
+      passes: [],
+      items: [{ ...candidate("Source minimal", "source minimal"), lens: "minimal_path" }],
+    });
+    const feedback = "Focus on the lower-risk path.";
+    project.setScript(
+      refinementScriptEntries({
+        model: "proposal-light",
+        feedback,
+        previousTitle: "Source minimal",
+      }),
+    );
+
+    const promptedProposalIds: string[] = [];
+    const feedbackResponses = [feedback, ""];
+    const output = await captureConsole(async () => {
+      await reviewProposal(
+        requireProject().ctx(),
+        { file: proposal.id },
+        {
+          isTty: true,
+          prompt: async (current) => {
+            promptedProposalIds.push(current.id);
+            return [];
+          },
+          feedbackPrompt: async () => feedbackResponses.shift() ?? "",
+        },
+      );
+    });
+
+    const refinedId = `${proposal.id}-refined`;
+    const refinedFile = join(project.root, ".nightcrew/proposals", `${refinedId}.json`);
+    const archivedSource = join(project.ctx().paths.archivedProposalsDir, `${proposal.id}.json`);
+    const refined = readProposalArtifact(refinedFile);
+    expect(output.stderr).toBe("");
+    expect(promptedProposalIds).toEqual([proposal.id, refinedId]);
+    expect(output.stdout).toContain(`refined .nightcrew/proposals/${refinedId}.json`);
+    expect(output.stdout).toContain("no items selected; proposal left pending");
+    expect(refined.refinedFrom).toBe(proposal.id);
+    expect(refined.feedback).toBe(feedback);
+    expect(existsSync(file)).toBe(false);
+    expect(existsSync(archivedSource)).toBe(true);
+    expect(existsSync(refinedFile)).toBe(true);
+  });
+
   it("lists pending proposals, selects bodies verbatim, and archives the artifact", async () => {
     project = await makeTempProject();
     project.setCrew(["Keep existing backlog item"]);
@@ -278,6 +455,12 @@ describe("nightcrew propose", () => {
 
   it("leaves crew.md and the artifact untouched when interactive review selects nothing", async () => {
     project = await makeTempProject();
+    project.setScript([
+      {
+        match: "this script must not be consumed when feedback is empty",
+        structuredOutput: { candidates: [candidate("Should not run", "unused")] },
+      },
+    ]);
     const { file, proposal } = writeProposalArtifact(project.ctx().paths, {
       goal: "Maybe later",
       routingTier: "light",
@@ -297,10 +480,12 @@ describe("nightcrew propose", () => {
             stdoutBeforePrompt = captured.stdout();
             return [];
           },
+          feedbackPrompt: async () => "",
         },
       );
     });
 
+    const archived = join(project.ctx().paths.archivedProposalsDir, `${proposal.id}.json`);
     expect(output.stderr).toBe("");
     expect(output.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
     expect(stdoutBeforePrompt).toContain("1. Deferred item");
@@ -309,6 +494,7 @@ describe("nightcrew propose", () => {
     expect(output.stdout).toContain("no items selected; proposal left pending");
     expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
     expect(existsSync(file)).toBe(true);
+    expect(existsSync(archived)).toBe(false);
   });
 
   it("does not write an artifact when a proposal pass fails", async () => {
