@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.4.0
+
+The polish release: propose runs three concurrent research passes with live
+per-lens progress, a preview-pane picker, and language mirroring; config gets
+editor autocomplete; releases get automation + provenance. Seven plans, one
+unattended run (including one mid-iteration crash recovery), built by
+nightcrew on itself.
 
 - Added `README.zh-CN.md` as the maintained Simplified Chinese README and
   included it in the npm package file whitelist.

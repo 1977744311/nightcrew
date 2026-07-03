@@ -111,7 +111,7 @@ an empty backlog means the crew idles instead of inventing work.
       unaffected. Tests cover config parsing/defaults, adapter option
       passing, and the prompt containing the research guidance. Tests
       included.
-- [ ] Propose progress feedback + concurrent passes: run the three lens
+- [x] Propose progress feedback + concurrent passes: run the three lens
       passes concurrently (they are read-only and independent) and show
       per-lens live progress. TTY mode: one status line per lens — running,
       then completed with elapsed seconds and candidate count, or failed
@@ -121,7 +121,7 @@ an empty backlog means the crew idles instead of inventing work.
       risk), never completion order. Error semantics unchanged: any failed
       pass fails the whole command. Tests cover stable ordering under
       out-of-order completion and the failure path. Tests included.
-- [ ] Proposal picker preview pane (kill the duplicated pre-print): in TTY
+- [x] Proposal picker preview pane (kill the duplicated pre-print): in TTY
       flows, stop printing the full candidate list before the picker.
       Instead build a custom multiselect on `@clack/core` (already
       installed — do NOT add other dependencies) where the highlighted
@@ -132,7 +132,7 @@ an empty backlog means the crew idles instead of inventing work.
       unchanged (numbered full bodies + `propose select --ids` hint).
       Unit-test the preview rendering pure function; the raw TTY event
       loop may stay untested. Tests included.
-- [ ] Propose mirrors the operator's language: candidate title, body, and
+- [x] Propose mirrors the operator's language: candidate title, body, and
       rationale must be written in the language of the goal text — a
       Chinese goal yields Chinese candidates, an English goal yields
       English. Implement as prompt instructions in the proposal passes (no
@@ -141,7 +141,7 @@ an empty backlog means the crew idles instead of inventing work.
       format rules (checkbox first line, 3-10 lines) apply regardless of
       language. Tests assert the prompts carry the language-mirroring
       instruction. Tests included.
-- [ ] Config JSON Schema for editor autocomplete: generate
+- [x] Config JSON Schema for editor autocomplete: generate
       `schema/config.schema.json` from the zod config schema using zod v4's
       native `z.toJSONSchema` (no new dependencies). Add an `npm run schema`
       script, commit the generated file, and add a test that regenerates the
@@ -150,7 +150,7 @@ an empty backlog means the crew idles instead of inventing work.
       `# yaml-language-server: $schema=` comment pointing at the raw GitHub
       URL of the committed schema so editors autocomplete `config.yaml`.
       Tests included.
-- [ ] Release automation with changesets + npm provenance: add
+- [x] Release automation with changesets + npm provenance: add
       `.github/workflows/release.yml` using the official changesets action
       (version PR flow; publish runs `npm publish --provenance` and needs the
       `NPM_TOKEN` secret — configuring the secret itself is operator work,
@@ -158,7 +158,7 @@ an empty backlog means the crew idles instead of inventing work.
       `publishConfig.provenance` in package.json. Do NOT change existing CI
       or version numbers. Keep the manual `npm version` + tag flow documented
       as fallback.
-- [ ] Launch write-up draft at `docs/launch.md`: "what 700+ unattended
+- [x] Launch write-up draft at `docs/launch.md`: "what 700+ unattended
       iterations taught us about loop engineering". Ground every claim ONLY
       in ROADMAP.md (requirements table, constitution), docs/concepts.md,
       and CHANGELOG.md — do not invent metrics, benchmarks, or anecdotes not
@@ -168,7 +168,7 @@ an empty backlog means the crew idles instead of inventing work.
       CHANGELOG). Mark operator-voice gaps with `<!-- operator: ... -->`
       comments instead of fabricating. No code changes.
 
-- [ ] Add `README.zh-CN.md` as a Chinese translation of the current `README.md`, preserving the same structure, command names, config keys, links, status, and license details.
+- [x] Add `README.zh-CN.md` as a Chinese translation of the current `README.md`, preserving the same structure, command names, config keys, links, status, and license details.
       Add an English-only language link from `README.md` to `README.zh-CN.md`, and a backlink from the Chinese file to `README.md`.
       Keep Han-script text allowed only in `README.zh-CN.md`; no source, tests, docs, package metadata, changelog text, or CLI output should contain Chinese.
       Add focused tests that scan tracked text files for Han characters outside `README.zh-CN.md` and assert package publishing metadata includes the localized README.
