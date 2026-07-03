@@ -94,6 +94,8 @@ export interface PlanDoc {
   file: string;
   status: PlanStatus;
   parallel: boolean;
+  /** Exact first-line text of the unchecked BACKLOG item this plan covers. */
+  backlog?: string;
   maxIterations?: number;
   createdAt?: string;
   body: string;

@@ -27,6 +27,7 @@ import { mergeBranch } from "../git/merge";
 import { enforceWriteScope, snapshotDirtyPaths } from "../git/scope";
 import { ensureWorktree, planBranch, removeWorktree } from "../git/worktree";
 import { notifyWebhook } from "../notify/webhook";
+import { checkOffBacklogItem } from "../plans/backlog";
 import { findPlan, listPlans, movePlan, readPlan, validatePlan } from "../plans/plans";
 import { overTokenCap, quotaResumeAt } from "../policy/budget";
 import { applyIteration } from "../policy/guards";
@@ -410,7 +411,8 @@ async function concludePlanOp(
 
   const plan = newPlans[0] as PlanDoc;
   record.planId = plan.id;
-  const problems = validatePlan(plan);
+  const crew = controlSurface(paths.crewFile) ?? "";
+  const problems = validatePlan(plan, { crew });
   if (problems.length > 0) {
     await revertAllNew();
     record.status = "failed";
@@ -420,7 +422,7 @@ async function concludePlanOp(
 
   const review = await deps.reviewer.reviewPlan({
     plan,
-    crew: controlSurface(paths.crewFile) ?? "",
+    crew,
   });
   record.reviews = [review];
 
@@ -684,14 +686,23 @@ async function promotePlan(
     record.notes?.push(`merge review (${review.verdict}): ${review.notes.slice(0, 300)}`);
   }
 
-  const completePlanFiles = async (note: string): Promise<void> => {
+  const completePlanFiles = async (
+    note: string,
+    options: { checkOffBacklog?: boolean } = {},
+  ): Promise<void> => {
     const mainPlan = listPlans(paths, "active").find((candidate) => candidate.id === plan.id);
     const moved: string[] = [];
+    const completedPlan = mainPlan ?? plan;
+    if (options.checkOffBacklog) {
+      const checkoff = checkOffBacklogItem(paths, completedPlan.backlog);
+      if (checkoff.note) record.notes?.push(checkoff.note);
+      if (checkoff.changed) moved.push(relative(root, paths.crewFile));
+    }
     if (mainPlan) {
       const target = movePlan(paths, mainPlan, "completed");
       moved.push(relative(root, mainPlan.file), relative(root, target));
     }
-    await commitPaths(root, moved, `nightcrew: complete plan ${plan.id}${note}`);
+    await commitPaths(root, [...new Set(moved)], `nightcrew: complete plan ${plan.id}${note}`);
     delete state.sessions[plan.id];
     delete state.reviewRounds[plan.id];
     if (state.activePlanId === plan.id) state.activePlanId = null;
@@ -710,7 +721,7 @@ async function promotePlan(
     case "merged": {
       record.merged = true;
       record.commits.push(outcome.sha);
-      await completePlanFiles("");
+      await completePlanFiles("", { checkOffBacklog: true });
       await removeWorktree(paths, plan.id, { deleteBranch: "merged" });
       record.notes?.push(`landed ${branch} into ${baseBranch}`);
       return null;

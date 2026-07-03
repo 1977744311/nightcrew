@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added optional plan frontmatter `backlog` mappings, deterministic plan-review
+  validation against unchecked BACKLOG items, and runner-owned post-merge
+  BACKLOG checkoff with history notes for missing or ambiguous matches.
 - Added a shared provider preflight for `nightcrew doctor`, `nightcrew loop`,
   and `crew start`; Codex projects now verify readable `auth.json` credentials
   with a `codex login` hint, while fake-provider projects report a skip.
