@@ -24,6 +24,7 @@ import {
   statusEntries,
 } from "../git/git";
 import { mergeBranch } from "../git/merge";
+import { publishPullRequest } from "../git/pull-request";
 import { enforceWriteScope, snapshotDirtyPaths } from "../git/scope";
 import { ensureWorktree, planBranch, removeWorktree } from "../git/worktree";
 import { notifyWebhook } from "../notify/webhook";
@@ -59,6 +60,41 @@ export interface RunOptions {
 interface StopOverride {
   reason: StopReason;
   detail: string;
+}
+
+function markdownSection(body: string, heading: string): string {
+  const target = heading.toLowerCase();
+  const lines = body.split(/\r?\n/);
+  const out: string[] = [];
+  let collecting = false;
+  for (const line of lines) {
+    const match = /^(#{2,6})\s+(.+?)\s*$/.exec(line);
+    if (match) {
+      if (collecting) break;
+      collecting = match[2]?.trim().toLowerCase() === target;
+      continue;
+    }
+    if (collecting) out.push(line);
+  }
+  return out.join("\n").trim();
+}
+
+function pullRequestTitle(plan: PlanDoc): string {
+  return `nightcrew: ${plan.title}`;
+}
+
+function pullRequestBody(plan: PlanDoc, branch: string): string {
+  const acceptance = markdownSection(plan.body, "Acceptance") || "No acceptance checklist found.";
+  return [
+    "## Plan",
+    plan.title,
+    "",
+    `Plan id: ${plan.id}`,
+    `Source branch: ${branch}`,
+    "",
+    "## Acceptance",
+    acceptance,
+  ].join("\n");
 }
 
 function failureKindFor(result: ProviderRunResult): FailureKind {
@@ -714,6 +750,49 @@ async function promotePlan(
     await removeWorktree(paths, plan.id, { deleteBranch: "keep" });
     record.notes?.push(`branch ready for manual merge: ${branch}`);
     return null;
+  }
+
+  if (config.git.mergeMode === "pr") {
+    const outcome = await publishPullRequest(
+      root,
+      baseBranch,
+      branch,
+      pullRequestTitle(plan),
+      pullRequestBody(plan, branch),
+    );
+    switch (outcome.result) {
+      case "created": {
+        record.merged = true;
+        await completePlanFiles(" (pull request opened)", { checkOffBacklog: true });
+        await removeWorktree(paths, plan.id, { deleteBranch: "force" });
+        record.notes?.push(`opened pull request: ${outcome.url}`);
+        record.notes?.push(`pushed ${branch} for review against ${baseBranch}`);
+        return null;
+      }
+      case "push_failed": {
+        record.status = "failed";
+        record.failure = { kind: "git_push_failed", message: outcome.detail.slice(0, 2_000) };
+        state.pendingRepairs[plan.id] = {
+          planId: plan.id,
+          reason: "git_push_failed",
+          message: `push ${branch} to origin before opening a pull request: ${outcome.detail.slice(0, 1_000)}`,
+        };
+        return null;
+      }
+      case "create_failed": {
+        record.status = "failed";
+        record.failure = {
+          kind: "pull_request_failed",
+          message: outcome.detail.slice(0, 2_000),
+        };
+        state.pendingRepairs[plan.id] = {
+          planId: plan.id,
+          reason: "pull_request_failed",
+          message: `create a pull request for ${branch} against ${baseBranch}: ${outcome.detail.slice(0, 1_000)}`,
+        };
+        return null;
+      }
+    }
   }
 
   const outcome = await mergeBranch(root, baseBranch, branch, `nightcrew: land plan ${plan.id}`);
