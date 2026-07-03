@@ -35,8 +35,11 @@ export {
 } from "./plans/accounting";
 export { findPlan, listPlans, parsePlanFile, validatePlan } from "./plans/plans";
 export {
+  type GenerateProposalOptions,
   generateProposal,
   PROPOSAL_OUTPUT_SCHEMA,
+  type ProposalProgressEvent,
+  type ProposalProgressReporter,
   type RefineProposalOptions,
   type RefineProposalResult,
   refineProposal,

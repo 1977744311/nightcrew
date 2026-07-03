@@ -1,7 +1,7 @@
 import type { NightcrewConfig } from "../config/schema";
 import type { ProjectPaths } from "../core/paths";
 import { proposeModel, webSearchModeFor } from "../providers/factory";
-import type { Provider } from "../providers/types";
+import type { Provider, ProviderRunResult } from "../providers/types";
 import { readTextIfExists } from "../utils/fs";
 import type { ProposalArtifact } from "./proposals";
 import {
@@ -66,6 +66,7 @@ export interface GenerateProposalOptions {
   paths: ProjectPaths;
   config: NightcrewConfig;
   provider: Provider;
+  onProgress?: ProposalProgressReporter;
 }
 
 export interface RefineProposalOptions {
@@ -75,12 +76,20 @@ export interface RefineProposalOptions {
   paths: ProjectPaths;
   config: NightcrewConfig;
   provider: Provider;
+  onProgress?: ProposalProgressReporter;
 }
 
 export interface RefineProposalResult {
   artifact: ProposalArtifactFile;
   archivedFile: string;
 }
+
+export type ProposalProgressEvent =
+  | { kind: "start"; lens: ProposalLens }
+  | { kind: "finish"; lens: ProposalLens; elapsedMs: number; candidateCount: number }
+  | { kind: "failure"; lens: ProposalLens; elapsedMs: number; reason: string };
+
+export type ProposalProgressReporter = (event: ProposalProgressEvent) => void;
 
 function parseJsonObject(text: string): unknown {
   const candidates: string[] = [];
@@ -131,6 +140,21 @@ function parseLensOutput(text: string, lens: ProposalLens): LensOutput {
       };
     }),
   };
+}
+
+function proposalPassError(lens: ProposalLens, result: ProviderRunResult): Error {
+  return new Error(
+    `proposal pass ${lens} failed (${result.status}): ${result.errorMessage ?? "unknown"}`,
+  );
+}
+
+function progressFailureReason(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function nowMs(): number {
+  return Date.now();
 }
 
 function proposalPrompt(input: {
@@ -216,6 +240,7 @@ async function runProposalPasses(options: {
   paths: ProjectPaths;
   config: NightcrewConfig;
   provider: Provider;
+  onProgress?: ProposalProgressReporter;
   refinement?: {
     source: ProposalArtifact;
     feedback: string;
@@ -228,38 +253,75 @@ async function runProposalPasses(options: {
   if (!goal) throw new Error("proposal goal is required");
 
   const crew = readTextIfExists(options.paths.crewFile) ?? "";
-  const items: Array<LensCandidate & { lens: ProposalLens }> = [];
-  const passes: ProposalPass[] = [];
+  const startedAt = new Map<ProposalLens, number>();
 
   for (const lens of PROPOSAL_LENSES) {
-    const result = await options.provider.run({
-      prompt: proposalPrompt({
-        goal,
-        projectName: options.config.project.name,
-        lens,
-        crew,
-        ...(options.refinement ? { refinement: options.refinement } : {}),
-      }),
-      workingDirectory: options.root,
-      model: proposeModel(options.config),
-      webSearchMode: webSearchModeFor(options.config, "propose"),
-      sessionId: null,
-      timeoutMs: Math.min(options.config.loop.iterationTimeoutMs, 900_000),
-      idleTimeoutMs: options.config.loop.idleTimeoutMs,
-      readOnly: true,
-      outputSchema: PROPOSAL_OUTPUT_SCHEMA,
-    });
-
-    if (result.status !== "ok") {
-      throw new Error(
-        `proposal pass ${lens} failed (${result.status}): ${result.errorMessage ?? "unknown"}`,
-      );
-    }
-
-    const output = parseLensOutput(result.finalMessage, lens);
-    items.push(...output.candidates.map((candidate) => ({ ...candidate, lens })));
-    passes.push({ lens, sessionId: result.sessionId, usage: result.usage });
+    startedAt.set(lens, nowMs());
+    options.onProgress?.({ kind: "start", lens });
   }
+
+  const jobs = PROPOSAL_LENSES.map(async (lens) => {
+    try {
+      const result = await options.provider.run({
+        prompt: proposalPrompt({
+          goal,
+          projectName: options.config.project.name,
+          lens,
+          crew,
+          ...(options.refinement ? { refinement: options.refinement } : {}),
+        }),
+        workingDirectory: options.root,
+        model: proposeModel(options.config),
+        webSearchMode: webSearchModeFor(options.config, "propose"),
+        sessionId: null,
+        timeoutMs: Math.min(options.config.loop.iterationTimeoutMs, 900_000),
+        idleTimeoutMs: options.config.loop.idleTimeoutMs,
+        readOnly: true,
+        outputSchema: PROPOSAL_OUTPUT_SCHEMA,
+      });
+
+      if (result.status !== "ok") {
+        throw proposalPassError(lens, result);
+      }
+
+      const output = parseLensOutput(result.finalMessage, lens);
+      const elapsedMs = nowMs() - (startedAt.get(lens) ?? nowMs());
+      options.onProgress?.({
+        kind: "finish",
+        lens,
+        elapsedMs,
+        candidateCount: output.candidates.length,
+      });
+      return {
+        lens,
+        items: output.candidates.map((candidate) => ({ ...candidate, lens })),
+        pass: { lens, sessionId: result.sessionId, usage: result.usage },
+      };
+    } catch (error) {
+      options.onProgress?.({
+        kind: "failure",
+        lens,
+        elapsedMs: nowMs() - (startedAt.get(lens) ?? nowMs()),
+        reason: progressFailureReason(error),
+      });
+      throw error;
+    }
+  });
+
+  const settled = await Promise.allSettled(jobs);
+  const firstFailure = settled.find(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
+  if (firstFailure) {
+    throw firstFailure.reason;
+  }
+
+  const ordered = settled.map((result) => {
+    if (result.status === "rejected") throw result.reason;
+    return result.value;
+  });
+  const items = ordered.flatMap((result) => result.items);
+  const passes = ordered.map((result) => result.pass);
 
   if (items.length === 0) {
     throw new Error("proposal generation produced no candidate items");
@@ -295,6 +357,7 @@ export async function refineProposal(
     paths: options.paths,
     config: options.config,
     provider: options.provider,
+    onProgress: options.onProgress,
     refinement: { source, feedback },
   });
 

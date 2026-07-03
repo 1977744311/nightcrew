@@ -1,7 +1,11 @@
 import { relative } from "node:path";
 import pc from "picocolors";
 import type { ProjectContext } from "../config/load";
-import { generateProposal, refineProposal } from "../proposals/generate";
+import {
+  generateProposal,
+  type ProposalProgressReporter,
+  refineProposal,
+} from "../proposals/generate";
 import {
   listPendingProposals,
   loadProposalArtifact,
@@ -16,10 +20,30 @@ import {
   printProposalSelectionResult,
   reviewProposalSelection,
 } from "./proposal-selection";
+import {
+  createProposalProgressReporter,
+  type ProposalProgressRenderOptions,
+} from "./propose-progress";
+
+export type ProposeCommandOptions = ProposalSelectionOptions & {
+  progress?: ProposalProgressReporter | false;
+  progressRender?: ProposalProgressRenderOptions;
+};
+
+function proposalProgress(options: ProposeCommandOptions): ProposalProgressReporter | undefined {
+  if (options.progress === false) return undefined;
+  return options.progress ?? createProposalProgressReporter(options.progressRender);
+}
+
+function selectionOptions(options: ProposeCommandOptions): ProposalSelectionOptions {
+  const { progress: _progress, progressRender: _progressRender, ...selection } = options;
+  return selection;
+}
 
 function withFeedbackRefinement(
   ctx: ProjectContext,
   existingProvider?: ReturnType<typeof buildProvider>,
+  options: ProposeCommandOptions = {},
 ): ProposalSelectionOptions["refineOnEmpty"] {
   let provider = existingProvider;
   return async (artifact, feedback) => {
@@ -31,6 +55,7 @@ function withFeedbackRefinement(
       paths: ctx.paths,
       config: ctx.config,
       provider,
+      onProgress: proposalProgress(options),
     });
     printProposalHeader(ctx, result.artifact, "refined");
     printProposalArchive(ctx, result.archivedFile);
@@ -41,7 +66,7 @@ function withFeedbackRefinement(
 export async function runPropose(
   ctx: ProjectContext,
   goal: string,
-  options: ProposalSelectionOptions = {},
+  options: ProposeCommandOptions = {},
 ): Promise<void> {
   const provider = buildProvider(ctx.config, ctx.root);
   const artifact = await generateProposal({
@@ -50,11 +75,12 @@ export async function runPropose(
     paths: ctx.paths,
     config: ctx.config,
     provider,
+    onProgress: proposalProgress(options),
   });
   printProposalHeader(ctx, artifact, "created");
   await reviewProposalSelection(ctx, artifact, {
-    refineOnEmpty: withFeedbackRefinement(ctx, provider),
-    ...options,
+    refineOnEmpty: withFeedbackRefinement(ctx, provider, options),
+    ...selectionOptions(options),
   });
 }
 
@@ -81,7 +107,7 @@ export function selectProposal(ctx: ProjectContext, idsValue: string, proposal?:
 export async function reviewProposal(
   ctx: ProjectContext,
   options: { file?: string; latest?: boolean },
-  selectionOptions: ProposalSelectionOptions = {},
+  commandOptions: ProposeCommandOptions = {},
 ): Promise<void> {
   if (options.file && options.latest) {
     throw new Error("use --latest or <file>, not both");
@@ -90,15 +116,15 @@ export async function reviewProposal(
   printProposalHeader(ctx, artifact, "reviewing");
   await reviewProposalSelection(ctx, artifact, {
     includeProposalHint: true,
-    refineOnEmpty: withFeedbackRefinement(ctx),
-    ...selectionOptions,
+    refineOnEmpty: withFeedbackRefinement(ctx, undefined, commandOptions),
+    ...selectionOptions(commandOptions),
   });
 }
 
 export async function refineStoredProposal(
   ctx: ProjectContext,
   options: { file?: string; feedback: string },
-  selectionOptions: ProposalSelectionOptions = {},
+  commandOptions: ProposeCommandOptions = {},
 ): Promise<void> {
   const feedback = options.feedback.trim();
   if (!feedback) throw new Error("--feedback must not be empty");
@@ -111,12 +137,13 @@ export async function refineStoredProposal(
     paths: ctx.paths,
     config: ctx.config,
     provider,
+    onProgress: proposalProgress(commandOptions),
   });
   printProposalHeader(ctx, result.artifact, "refined");
   printProposalArchive(ctx, result.archivedFile);
   await reviewProposalSelection(ctx, result.artifact, {
     includeProposalHint: true,
-    refineOnEmpty: withFeedbackRefinement(ctx, provider),
-    ...selectionOptions,
+    refineOnEmpty: withFeedbackRefinement(ctx, provider, commandOptions),
+    ...selectionOptions(commandOptions),
   });
 }

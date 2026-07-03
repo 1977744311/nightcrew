@@ -3,13 +3,15 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/program";
 import { reviewProposal, runPropose } from "../src/cli/propose";
-import { generateProposal } from "../src/proposals/generate";
+import { createProposalProgressReporter } from "../src/cli/propose-progress";
+import { generateProposal, type ProposalProgressEvent } from "../src/proposals/generate";
 import {
   listPendingProposals,
+  type ProposalLens,
   readProposalArtifact,
   writeProposalArtifact,
 } from "../src/proposals/proposals";
-import type { Provider, ProviderRunOptions } from "../src/providers/types";
+import type { Provider, ProviderRunOptions, ProviderRunResult } from "../src/providers/types";
 import { makeTempProject, type TestProject } from "./helpers";
 
 let project: TestProject | undefined;
@@ -57,6 +59,49 @@ function candidate(title: string, lens: string) {
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function lensFromPrompt(prompt: string): ProposalLens {
+  if (prompt.includes("minimal path")) return "minimal_path";
+  if (prompt.includes("architecture-first")) return "architecture_first";
+  if (prompt.includes("risk-first")) return "risk_first";
+  throw new Error(`could not identify proposal lens from prompt: ${prompt}`);
+}
+
+function proposalRunResult(lens: ProposalLens, title: string): ProviderRunResult {
+  return {
+    status: "ok",
+    finalMessage: JSON.stringify({ candidates: [candidate(title, lens)] }),
+    sessionId: `${lens}-session`,
+    usage: null,
+  };
+}
+
+function deferredProvider(): {
+  provider: Provider;
+  runs: ProposalLens[];
+  resolve: (lens: ProposalLens, result: ProviderRunResult) => void;
+} {
+  const runs: ProposalLens[] = [];
+  const resolvers = new Map<ProposalLens, (result: ProviderRunResult) => void>();
+  return {
+    runs,
+    provider: {
+      name: "deferred",
+      run: async (options) => {
+        const lens = lensFromPrompt(options.prompt);
+        runs.push(lens);
+        return await new Promise<ProviderRunResult>((resolve) => {
+          resolvers.set(lens, resolve);
+        });
+      },
+    },
+    resolve: (lens, result) => {
+      const resolve = resolvers.get(lens);
+      if (!resolve) throw new Error(`proposal pass ${lens} has not started`);
+      resolve(result);
+    },
+  };
 }
 
 function proposalScriptEntries(model: string) {
@@ -150,6 +195,8 @@ describe("nightcrew propose", () => {
     const relPath = ".nightcrew/proposals/2026-07-03-add-proposal-workflow.json";
     const file = join(project.root, relPath);
     expect(output.stderr).toBe("");
+    expect(output.stdout).toContain("proposal pass minimal_path started");
+    expect(output.stdout).toContain("proposal pass risk_first completed");
     expect(output.stdout).toContain(`created ${relPath}`);
     expect(output.stdout).toContain("1. Minimal candidate");
     expect(output.stdout).toContain("3. Risk candidate");
@@ -176,6 +223,119 @@ describe("nightcrew propose", () => {
       runCli(["propose", "Add proposal workflow", "--root", project?.root ?? ""]),
     );
     expect(listPendingProposals(project.ctx().paths).map((entry) => entry.file)).toEqual([file]);
+  });
+
+  it("keeps candidate numbering in lens order when concurrent passes finish out of order", async () => {
+    project = await makeTempProject();
+    const deferred = deferredProvider();
+    const events: ProposalProgressEvent[] = [];
+
+    const pending = generateProposal({
+      goal: "Order concurrent proposal passes",
+      root: project.root,
+      paths: project.ctx().paths,
+      config: project.ctx().config,
+      provider: deferred.provider,
+      onProgress: (event) => events.push(event),
+    });
+
+    expect(deferred.runs).toEqual(["minimal_path", "architecture_first", "risk_first"]);
+    expect(events.filter((event) => event.kind === "start").map((event) => event.lens)).toEqual([
+      "minimal_path",
+      "architecture_first",
+      "risk_first",
+    ]);
+
+    deferred.resolve("risk_first", proposalRunResult("risk_first", "Risk finished first"));
+    deferred.resolve("minimal_path", proposalRunResult("minimal_path", "Minimal finished second"));
+    deferred.resolve(
+      "architecture_first",
+      proposalRunResult("architecture_first", "Architecture finished last"),
+    );
+
+    const artifact = await pending;
+    expect(artifact.proposal.items.map((item) => `${item.id}:${item.title}`)).toEqual([
+      "1:Minimal finished second",
+      "2:Architecture finished last",
+      "3:Risk finished first",
+    ]);
+    expect(artifact.proposal.items.map((item) => item.lens)).toEqual([
+      "minimal_path",
+      "architecture_first",
+      "risk_first",
+    ]);
+    expect(artifact.proposal.passes.map((pass) => pass.lens)).toEqual([
+      "minimal_path",
+      "architecture_first",
+      "risk_first",
+    ]);
+    expect(events.filter((event) => event.kind === "finish").map((event) => event.lens)).toEqual([
+      "risk_first",
+      "minimal_path",
+      "architecture_first",
+    ]);
+  });
+
+  it("fails the whole proposal when any concurrent pass fails", async () => {
+    project = await makeTempProject();
+    const deferred = deferredProvider();
+    const events: ProposalProgressEvent[] = [];
+
+    const pending = generateProposal({
+      goal: "Fail one concurrent proposal pass",
+      root: project.root,
+      paths: project.ctx().paths,
+      config: project.ctx().config,
+      provider: deferred.provider,
+      onProgress: (event) => events.push(event),
+    });
+
+    expect(deferred.runs).toEqual(["minimal_path", "architecture_first", "risk_first"]);
+    deferred.resolve("risk_first", {
+      status: "error",
+      finalMessage: "",
+      sessionId: "risk-session",
+      usage: null,
+      errorMessage: "risk research failed",
+    });
+    deferred.resolve("minimal_path", proposalRunResult("minimal_path", "Minimal still finished"));
+    deferred.resolve(
+      "architecture_first",
+      proposalRunResult("architecture_first", "Architecture still finished"),
+    );
+
+    await expect(pending).rejects.toThrow(
+      "proposal pass risk_first failed (error): risk research failed",
+    );
+    expect(events.filter((event) => event.kind === "failure").map((event) => event.lens)).toEqual([
+      "risk_first",
+    ]);
+    expect(listPendingProposals(project.ctx().paths)).toEqual([]);
+  });
+
+  it("renders TTY proposal progress as stable live lens lines", () => {
+    const writes: string[] = [];
+    const stream = {
+      isTTY: true,
+      write: (chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+      },
+    } as NodeJS.WritableStream & { isTTY: boolean };
+    const progress = createProposalProgressReporter({ isTty: true, stream });
+
+    progress({ kind: "start", lens: "minimal_path" });
+    progress({ kind: "start", lens: "architecture_first" });
+    progress({ kind: "start", lens: "risk_first" });
+    progress({ kind: "finish", lens: "risk_first", elapsedMs: 1234, candidateCount: 2 });
+    progress({ kind: "failure", lens: "minimal_path", elapsedMs: 2000, reason: "bad output" });
+
+    const output = writes.join("");
+    expect(output).toContain("proposal minimal");
+    expect(output).toContain("proposal architecture");
+    expect(output).toContain("proposal risk");
+    expect(output).toContain("completed 1.2s (2 candidates)");
+    expect(output).toContain("failed 2.0s: bad output");
   });
 
   it("passes the propose web-search override and includes external research guidance", async () => {
@@ -561,6 +721,8 @@ describe("nightcrew propose", () => {
     );
 
     expect(process.exitCode).toBe(1);
+    expect(output.stdout).toContain("proposal pass minimal_path started");
+    expect(output.stdout).toContain("proposal pass minimal_path failed");
     expect(output.stderr).toContain("proposal pass minimal_path failed");
     expect(listPendingProposals(project.ctx().paths)).toEqual([]);
   });
