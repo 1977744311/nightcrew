@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import type { ProjectPaths } from "../core/paths";
@@ -205,7 +199,7 @@ export function parseProposalIds(value: string): string[] {
 function selectItems(proposal: ProposalArtifact, ids: string[]): ProposalItem[] {
   const byId = new Map(proposal.items.map((item) => [item.id, item]));
   const selected = ids.map((id) => byId.get(id));
-  const missing = ids.filter((id, index) => !selected[index]);
+  const missing = ids.filter((_id, index) => !selected[index]);
   if (missing.length > 0) {
     throw new Error(`proposal item id(s) not found: ${missing.join(",")}`);
   }

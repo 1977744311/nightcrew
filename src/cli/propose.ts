@@ -1,13 +1,13 @@
 import { relative } from "node:path";
 import pc from "picocolors";
 import type { ProjectContext } from "../config/load";
-import { buildProvider } from "../providers/factory";
 import { generateProposal } from "../proposals/generate";
 import {
   listPendingProposals,
   parseProposalIds,
   selectProposalItems,
 } from "../proposals/proposals";
+import { buildProvider } from "../providers/factory";
 
 export async function runPropose(ctx: ProjectContext, goal: string): Promise<void> {
   const provider = buildProvider(ctx.config, ctx.root);

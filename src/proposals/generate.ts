@@ -161,7 +161,9 @@ function proposalPrompt(input: {
   ].join("\n");
 }
 
-export async function generateProposal(options: GenerateProposalOptions): Promise<ProposalArtifactFile> {
+export async function generateProposal(
+  options: GenerateProposalOptions,
+): Promise<ProposalArtifactFile> {
   const goal = options.goal.trim();
   if (!goal) throw new Error("proposal goal is required");
 

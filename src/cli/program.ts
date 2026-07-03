@@ -217,7 +217,9 @@ export function buildProgram(): Command {
       }
     });
 
-  const propose = program.command("propose").description("turn a goal into reviewable BACKLOG candidates");
+  const propose = program
+    .command("propose")
+    .description("turn a goal into reviewable BACKLOG candidates");
   propose
     .argument("[goal...]", "one-line goal to research")
     .option("--root <dir>", "project root (default: cwd)")

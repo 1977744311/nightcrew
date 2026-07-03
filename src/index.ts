@@ -28,6 +28,28 @@ export * from "./core/types";
 export { type LoopOptions, type LoopResult, runLoop } from "./loop/loop";
 export { type RunnerDeps, type RunOptions, runIteration } from "./loop/runner";
 export { findPlan, listPlans, parsePlanFile, validatePlan } from "./plans/plans";
+export { generateProposal, PROPOSAL_OUTPUT_SCHEMA } from "./proposals/generate";
+export {
+  appendItemsToBacklog,
+  archiveProposal,
+  buildProposalArtifact,
+  type CandidateProposalItem,
+  latestPendingProposal,
+  listPendingProposals,
+  PROPOSAL_ARTIFACT_VERSION,
+  PROPOSAL_LENSES,
+  type ProposalArtifact,
+  type ProposalArtifactFile,
+  type ProposalItem,
+  type ProposalLens,
+  type ProposalPass,
+  parseProposalIds,
+  proposalArtifactSchema,
+  readProposalArtifact,
+  type SelectProposalResult,
+  selectProposalItems,
+  writeProposalArtifact,
+} from "./proposals/proposals";
 export { buildProvider } from "./providers/factory";
 export { renderPrompt } from "./providers/render";
 export type {
@@ -36,28 +58,6 @@ export type {
   ProviderRunOptions,
   ProviderRunResult,
 } from "./providers/types";
-export { generateProposal, PROPOSAL_OUTPUT_SCHEMA } from "./proposals/generate";
-export {
-  appendItemsToBacklog,
-  archiveProposal,
-  buildProposalArtifact,
-  latestPendingProposal,
-  listPendingProposals,
-  parseProposalIds,
-  PROPOSAL_ARTIFACT_VERSION,
-  proposalArtifactSchema,
-  PROPOSAL_LENSES,
-  readProposalArtifact,
-  selectProposalItems,
-  writeProposalArtifact,
-  type CandidateProposalItem,
-  type ProposalArtifact,
-  type ProposalArtifactFile,
-  type ProposalItem,
-  type ProposalLens,
-  type ProposalPass,
-  type SelectProposalResult,
-} from "./proposals/proposals";
 export { AgentReviewer, parseVerdict } from "./review/agent";
 export { buildReviewer } from "./review/factory";
 export { NullReviewer, type Reviewer } from "./review/types";
