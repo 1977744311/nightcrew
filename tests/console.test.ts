@@ -390,4 +390,115 @@ describe("console API", () => {
     expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
     expect(existsSync(file)).toBe(true);
   });
+
+  const QUESTIONS = [
+    "# Open Questions",
+    "",
+    "- [ ] (2026-07-03T22:10) how should the migration treat empty legacy fields?",
+    "      - A: backfill defaults silently (recommended)",
+    "      - B: skip and log => backlog: add skip-and-log handling to the migration",
+    "",
+    "- [x] (2026-07-01T03:00) keep the old CLI alias?",
+    "      answer: no",
+    "",
+  ].join("\n");
+
+  it("serves open questions with options on project detail and renders the panel", async () => {
+    project = await makeTempProject();
+    writeFileSync(project.ctx().paths.questionsFile, QUESTIONS, "utf8");
+
+    listen(false);
+    const page = (await request("/")).text;
+    expect(page).toContain("function renderQuestions");
+    expect(page).toContain("open questions");
+
+    const detail = (await request("/api/projects/demo")).json<{
+      questions: Array<{
+        key: string;
+        text: string;
+        options: Array<{ label: string; recommended: boolean; schedules: boolean }>;
+      }>;
+    }>();
+    expect(detail.questions).toHaveLength(1);
+    expect(detail.questions[0]?.text).toBe(
+      "(2026-07-03T22:10) how should the migration treat empty legacy fields?",
+    );
+    expect(detail.questions[0]?.options).toMatchObject([
+      { label: "A", recommended: true, schedules: false },
+      { label: "B", recommended: false, schedules: true },
+    ]);
+  });
+
+  it("answers a question from the console and schedules marked options into BACKLOG", async () => {
+    project = await makeTempProject();
+    project.setCrew(["Keep existing backlog item"]);
+    writeFileSync(project.ctx().paths.questionsFile, QUESTIONS, "utf8");
+
+    listen(true);
+    const detail = (await request("/api/projects/demo")).json<{
+      questions: Array<{ key: string }>;
+    }>();
+    const key = detail.questions[0]?.key ?? "";
+
+    const answered = await request("/api/projects/demo/questions/answer", {
+      method: "POST",
+      body: { key, answer: "B" },
+    });
+    expect(answered.status).toBe(200);
+    expect(answered.json()).toMatchObject({ ok: true, scheduled: true });
+
+    const questions = readFileSync(project.ctx().paths.questionsFile, "utf8");
+    expect(questions).toContain("- [x] (2026-07-03T22:10)");
+    expect(questions).toContain("      answer: B");
+    const crew = readFileSync(project.ctx().paths.crewFile, "utf8");
+    expect(crew).toContain("- [ ] add skip-and-log handling to the migration");
+
+    // The inbox is now empty and a replayed answer conflicts.
+    const after = (await request("/api/projects/demo")).json<{ questions: unknown[] }>();
+    expect(after.questions).toEqual([]);
+    const replay = await request("/api/projects/demo/questions/answer", {
+      method: "POST",
+      body: { key, answer: "A" },
+    });
+    expect(replay.status).toBe(409);
+  });
+
+  it("records question feedback for the crew to redraft options", async () => {
+    project = await makeTempProject();
+    writeFileSync(project.ctx().paths.questionsFile, QUESTIONS, "utf8");
+
+    listen(true);
+    const detail = (await request("/api/projects/demo")).json<{
+      questions: Array<{ key: string }>;
+    }>();
+    const key = detail.questions[0]?.key ?? "";
+
+    const bad = await request("/api/projects/demo/questions/feedback", {
+      method: "POST",
+      body: { key, feedback: "   " },
+    });
+    expect(bad.status).toBe(400);
+
+    const ok = await request("/api/projects/demo/questions/feedback", {
+      method: "POST",
+      body: { key, feedback: "none fit — consider a dry-run mode" },
+    });
+    expect(ok.status).toBe(200);
+    expect(readFileSync(project.ctx().paths.questionsFile, "utf8")).toContain(
+      "      feedback: none fit — consider a dry-run mode",
+    );
+
+    const after = (await request("/api/projects/demo")).json<{
+      questions: Array<{ feedback: string | null }>;
+    }>();
+    expect(after.questions[0]?.feedback).toBe("none fit — consider a dry-run mode");
+
+    // Read-only consoles cannot write answers or feedback.
+    listen(false);
+    const denied = await request("/api/projects/demo/questions/answer", {
+      method: "POST",
+      body: { key, answer: "A" },
+    });
+    expect(denied.status).toBe(404);
+  });
 });

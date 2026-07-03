@@ -1,7 +1,13 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { relative } from "node:path";
 import { projectPaths } from "../core/paths";
-import { parseProposalIds, selectProposalItems } from "../proposals/proposals";
+import {
+  appendItemsToBacklog,
+  parseProposalIds,
+  selectProposalItems,
+} from "../proposals/proposals";
+import { addQuestionFeedback, answerQuestion } from "../questions/questions";
 import { log } from "../utils/log";
 import { detail, registeredProjects, summarize } from "./data";
 import { consoleHtml } from "./page";
@@ -178,6 +184,50 @@ async function handleAction(
       selectedItemIds: result.selectedItems.map((item) => item.id),
       archivedFile: relative(root, result.archivedFile).replaceAll("\\", "/"),
     });
+    return true;
+  }
+  if (rest === "/questions/answer" || rest === "/questions/feedback") {
+    const body = parseJsonBody<{ key?: unknown; answer?: unknown; feedback?: unknown }>(
+      await readBody(req),
+    );
+    const value = rest === "/questions/answer" ? body.answer : body.feedback;
+    const field = rest === "/questions/answer" ? "answer" : "feedback";
+    if (typeof body.key !== "string" || !body.key.trim()) {
+      sendJson(res, 400, { error: "key must be a non-empty string" });
+      return true;
+    }
+    if (typeof value !== "string" || !value.trim()) {
+      sendJson(res, 400, { error: `${field} must be a non-empty string` });
+      return true;
+    }
+
+    if (!existsSync(paths.questionsFile)) {
+      sendJson(res, 404, { error: "questions.md not found" });
+      return true;
+    }
+    const markdown = readFileSync(paths.questionsFile, "utf8");
+    try {
+      if (rest === "/questions/answer") {
+        const result = answerQuestion(markdown, { key: body.key, answer: value });
+        writeFileSync(paths.questionsFile, result.markdown, "utf8");
+        if (result.scheduledBacklogItem) {
+          const crew = readFileSync(paths.crewFile, "utf8");
+          writeFileSync(
+            paths.crewFile,
+            appendItemsToBacklog(crew, [result.scheduledBacklogItem]),
+            "utf8",
+          );
+        }
+        sendJson(res, 200, { ok: true, scheduled: result.scheduledBacklogItem !== null });
+      } else {
+        const result = addQuestionFeedback(markdown, { key: body.key, feedback: value });
+        writeFileSync(paths.questionsFile, result.markdown, "utf8");
+        sendJson(res, 200, { ok: true });
+      }
+    } catch (error) {
+      // Stale key or already-answered entry: the page needs a reload, not a 500.
+      sendJson(res, 409, { error: error instanceof Error ? error.message : String(error) });
+    }
     return true;
   }
   return false;

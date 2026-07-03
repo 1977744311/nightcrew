@@ -82,6 +82,23 @@ export function consoleHtml(actions = false): string {
                              border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 12px;
                              cursor: pointer; }
   .proposal-actions button:hover { border-color: #35405a; }
+  .questions { display: grid; gap: 12px; }
+  .question + .question { border-top: 1px solid var(--line); padding-top: 12px; }
+  .question-text { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+  .question-options { list-style: none; margin: 8px 0 0; padding: 0; }
+  .question-options li { padding: 4px 0; }
+  .question-line { display: flex; gap: 8px; align-items: baseline; }
+  .question-line input { width: 14px; height: 14px; accent-color: var(--blue); flex: none; }
+  .question-option-text { overflow-wrap: anywhere; }
+  .question-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .question-actions input[type=text] { flex: 1; min-width: 0; background: var(--panel2);
+                                       border: 1px solid var(--line); border-radius: 6px;
+                                       color: var(--text); font: inherit; font-size: 12px;
+                                       padding: 4px 8px; }
+  .question-actions button { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+                             border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 12px;
+                             cursor: pointer; white-space: nowrap; }
+  .question-actions button:hover { border-color: #35405a; }
 </style>
 </head>
 <body>
@@ -122,6 +139,42 @@ function approveProposal(name, proposalId, container) {
   }).catch(function (e) {
     if (status) status.textContent = "approval failed: " + e.message;
   });
+}
+
+function postQuestion(name, action, payload, status) {
+  fetch("/api/projects/" + encodeURIComponent(name) + "/questions/" + action, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(function (r) {
+    if (!r.ok) return r.json().then(function (b) { throw new Error(b.error || ("http " + r.status)); });
+    return r.json();
+  }).then(function () {
+    route();
+  }).catch(function (e) {
+    if (status) status.textContent = action + " failed: " + e.message;
+  });
+}
+
+function answerQuestionEntry(name, key, container) {
+  var chosen = container.querySelector("input[type=radio]:checked");
+  var status = container.querySelector(".question-status");
+  if (!chosen) {
+    if (status) status.textContent = "pick an option first";
+    return;
+  }
+  postQuestion(name, "answer", { key: key, answer: chosen.value }, status);
+}
+
+function sendQuestionFeedback(name, key, container) {
+  var input = container.querySelector("input[type=text]");
+  var status = container.querySelector(".question-status");
+  var feedback = input ? input.value.trim() : "";
+  if (!feedback) {
+    if (status) status.textContent = "write feedback first";
+    return;
+  }
+  postQuestion(name, "feedback", { key: key, feedback: feedback }, status);
 }
 
 function actionButtons(name, state) {
@@ -201,6 +254,53 @@ function sparkline(records) {
   return svg;
 }
 
+function renderQuestions(d) {
+  var questions = d.questions || [];
+  var body = questions.length ? h("div", { class: "questions" }, questions.map(function (q) {
+    var section = h("div", { class: "question" }, []);
+    var badges = [];
+    if (q.feedback) badges.push(h("span", { class: "badge warn" }, ["awaiting new options"]));
+    var head = h("div", {}, [
+      h("div", { class: "question-text" }, [q.text].concat(badges)),
+    ]);
+    if (q.feedback) {
+      head.appendChild(h("div", { class: "kv" }, ["feedback: " + q.feedback]));
+    }
+    var options = h("ul", { class: "question-options" }, q.options.map(function (opt) {
+      var inputAttrs = { type: "radio", name: "q-" + q.key, value: opt.label };
+      if (!ACTIONS) inputAttrs.disabled = "disabled";
+      var optBadges = [];
+      if (opt.recommended) optBadges.push(h("span", { class: "badge ok" }, ["recommended"]));
+      if (opt.schedules) optBadges.push(h("span", { class: "badge" }, ["→ backlog"]));
+      return h("li", {}, [
+        h("label", { class: "question-line" }, [
+          h("input", inputAttrs, []),
+          h("span", { class: "question-option-text" }, [opt.label + ": " + opt.text].concat(optBadges)),
+        ]),
+      ]);
+    }));
+    section.appendChild(head);
+    if (q.options.length) section.appendChild(options);
+    else section.appendChild(h("div", { class: "kv" }, ["no options yet — leave feedback and the crew drafts some next run"]));
+    if (ACTIONS) {
+      var actions = h("div", { class: "question-actions" }, [
+        h("input", { type: "text", placeholder: "none of these? tell the crew what to redraft…" }, []),
+        h("button", { onclick: function () { sendQuestionFeedback(d.name, q.key, section); } }, ["send feedback"]),
+      ]);
+      if (q.options.length) {
+        actions.appendChild(h("button", { onclick: function () { answerQuestionEntry(d.name, q.key, section); } }, ["answer"]));
+      }
+      section.appendChild(actions);
+      section.appendChild(h("div", { class: "question-status kv" }, []));
+    }
+    return section;
+  })) : h("span", { class: "muted" }, ["none"]);
+  return h("section", {}, [
+    h("h3", {}, ["open questions (" + questions.length + ")"]),
+    h("div", { class: "panel" }, [body]),
+  ]);
+}
+
 function renderProposals(d) {
   var proposals = d.proposals || [];
   var body = proposals.length ? h("div", { class: "proposals" }, proposals.map(function (p) {
@@ -220,7 +320,8 @@ function renderProposals(d) {
     var children = [
       h("div", { class: "proposal-head" }, [
         h("div", {}, [
-          h("div", { class: "proposal-title" }, [p.goal]),
+          h("div", { class: "proposal-title" }, [p.goal].concat(
+            p.source === "qa" ? [h("span", { class: "badge warn" }, ["from qa.md"])] : [])),
           h("div", { class: "kv" }, [p.id + "  " + fmtTime(p.createdAt)]),
         ]),
       ]),
@@ -319,6 +420,7 @@ function renderDetail(d) {
       ]),
       h("section", {}, [h("h3", {}, ["active plans (" + d.plans.active.length + ")"]),
         h("div", { class: "panel" }, [d.plans.active.length ? h("ul", { class: "plans" }, planItems) : h("span", { class: "muted" }, ["none"])])]),
+      renderQuestions(d),
       renderProposals(d),
       renderPlanMetrics(d),
       h("section", {}, [h("h3", {}, ["token curve"]), h("div", { class: "panel" }, [sparkline(d.history)])]),

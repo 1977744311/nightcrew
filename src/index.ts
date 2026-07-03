@@ -28,6 +28,7 @@ export { NIGHTCREW_DIR, type ProjectPaths, projectPaths } from "./core/paths";
 export * from "./core/types";
 export { type LoopOptions, type LoopResult, runLoop } from "./loop/loop";
 export { type RunnerDeps, type RunOptions, runIteration } from "./loop/runner";
+export { maybeTriageQa, type QaTriageOutcome } from "./loop/triage";
 export {
   aggregatePlanHistory,
   type PlanHistoryMetric,
@@ -40,6 +41,8 @@ export {
   PROPOSAL_OUTPUT_SCHEMA,
   type ProposalProgressEvent,
   type ProposalProgressReporter,
+  QA_TRIAGE_GOAL,
+  qaDefectBullets,
   type RefineProposalOptions,
   type RefineProposalResult,
   refineProposal,
@@ -47,6 +50,7 @@ export {
 export {
   appendItemsToBacklog,
   archiveProposal,
+  BALANCED_LENS,
   buildProposalArtifact,
   type CandidateProposalItem,
   latestPendingProposal,
@@ -61,6 +65,7 @@ export {
   type ProposalPass,
   parseProposalIds,
   proposalArtifactSchema,
+  RESEARCH_LENSES,
   readProposalArtifact,
   type SelectProposalResult,
   selectProposalItems,
@@ -74,6 +79,15 @@ export type {
   ProviderRunOptions,
   ProviderRunResult,
 } from "./providers/types";
+export {
+  type AnswerQuestionResult,
+  addQuestionFeedback,
+  answerQuestion,
+  parseQuestions,
+  type QuestionEntry,
+  type QuestionFeedbackResult,
+  type QuestionOption,
+} from "./questions/questions";
 export { AgentReviewer, parseVerdict } from "./review/agent";
 export { buildReviewer } from "./review/factory";
 export { NullReviewer, type Reviewer } from "./review/types";

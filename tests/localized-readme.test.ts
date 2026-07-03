@@ -8,6 +8,10 @@ import { describe, expect, it } from "vitest";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const hanScript = /\p{Script=Han}/u;
 const hanAllowedFiles = new Set(["README.zh-CN.md"]);
+// The .nightcrew/ control surface is operator-owned operational data, not
+// product source. Operators write it in their own language — propose mirrors
+// the goal language into BACKLOG candidates, qa.md records defects verbatim.
+const hanAllowedPrefixes = [".nightcrew/"];
 
 type PackageJson = {
   files?: string[];
@@ -32,9 +36,12 @@ function isBinary(contents: Buffer): boolean {
 }
 
 describe("localized README guardrails", () => {
-  it("keeps Han script limited to the localized README", () => {
+  it("keeps Han script limited to the localized README and the control surface", () => {
     const offenders = trackedFiles().filter((file) => {
       if (hanAllowedFiles.has(file)) {
+        return false;
+      }
+      if (hanAllowedPrefixes.some((prefix) => file.startsWith(prefix))) {
         return false;
       }
 

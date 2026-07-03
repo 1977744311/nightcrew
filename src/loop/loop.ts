@@ -5,6 +5,7 @@ import { readState, updateState } from "../state/state";
 import { isoNow } from "../utils/id";
 import { log } from "../utils/log";
 import { type RunnerDeps, runIteration } from "./runner";
+import { maybeTriageQa } from "./triage";
 
 export interface LoopOptions {
   maxIterations?: number;
@@ -88,6 +89,7 @@ export async function runLoop(
       return { iterations, stop };
     }
 
+    await maybeTriageQa(ctx, deps.provider);
     const record = await runIteration(ctx, deps);
     iterations += 1;
     options.onRecord?.(record);

@@ -8,28 +8,18 @@ import { type IterationRecord, OPERATIONS, type Operation } from "../core/types"
 import { runLoop } from "../loop/loop";
 import { runIteration } from "../loop/runner";
 import { createActivePlan, findPlan, listPlans } from "../plans/plans";
+import { QA_TRIAGE_GOAL } from "../proposals/generate";
 import { buildProvider } from "../providers/factory";
 import { buildReviewer } from "../review/factory";
 import { acquireProjectLock, lockHolder } from "../state/lock";
 import { updateState } from "../state/state";
 import { renderDoctorReport, runDoctorChecks } from "./doctor";
 import { initProject } from "./init";
-import {
-  printProposalList,
-  refineStoredProposal,
-  reviewProposal,
-  runPropose,
-  selectProposal,
-} from "./propose";
+import { refineStoredProposal, resumeProposals, runPropose, selectProposal } from "./propose";
 import { printStatus } from "./status";
 
 function rootOf(options: { root?: string }): string {
   return resolve(options.root ?? process.cwd());
-}
-
-function rootOption(options: { root?: string }, command?: Command): string {
-  const parentOptions = (command?.parent?.opts() ?? {}) as { root?: string };
-  return rootOf({ root: options.root ?? parentOptions.root });
 }
 
 function parseHours(value: string): number {
@@ -223,71 +213,58 @@ export function buildProgram(): Command {
       }
     });
 
-  const propose = program
+  program
     .command("propose")
-    .description("turn a goal into reviewable BACKLOG candidates");
-  propose
-    .argument("[goal...]", "one-line goal to research")
-    .option("--root <dir>", "project root (default: cwd)")
-    .action(async (goalParts: string[], options: { root?: string }) => {
-      if (goalParts.length === 0) {
-        throw new Error('missing goal; use `nightcrew propose "<goal>"`');
-      }
-      const ctx = loadProject(rootOf(options));
-      await runPropose(ctx, goalParts.join(" "));
-    });
-  propose
-    .command("list")
-    .description("list pending proposal artifacts")
-    .option("--root <dir>", "project root (default: cwd)")
-    .action(async (options: { root?: string }, command: Command) => {
-      printProposalList(loadProject(rootOption(options, command)));
-    });
-  propose
-    .command("review")
-    .description("review a pending proposal artifact")
-    .argument("[file]", "proposal id or JSON file (default: latest pending)")
-    .option("--latest", "review the latest pending proposal")
+    .description("draft BACKLOG candidates from a goal; run bare to resume pending drafts")
+    .argument("[goal...]", "one-line goal to research (omit to resume pending proposals)")
+    .option("--lenses", "run three concurrent research passes (minimal / architecture / risk)")
+    .option("--from-qa", "draft candidates from the defects recorded in qa.md")
+    .option("--proposal <id-or-file>", "target a pending proposal (default: latest)")
+    .option("--ids <ids>", "append these candidate ids to BACKLOG and archive, e.g. 1,3")
+    .option("--feedback <text>", "regenerate the pending proposal from operator feedback")
     .option("--root <dir>", "project root (default: cwd)")
     .action(
       async (
-        file: string | undefined,
-        options: { latest?: boolean; root?: string },
-        command: Command,
+        goalParts: string[],
+        options: {
+          root?: string;
+          lenses?: boolean;
+          fromQa?: boolean;
+          proposal?: string;
+          ids?: string;
+          feedback?: string;
+        },
       ) => {
-        await reviewProposal(loadProject(rootOption(options, command)), {
-          file,
-          latest: options.latest,
-        });
-      },
-    );
-  propose
-    .command("refine")
-    .description("regenerate a pending proposal from operator feedback")
-    .argument("[file]", "proposal id or JSON file (default: latest pending)")
-    .requiredOption("--feedback <text>", "operator feedback to include in the refinement passes")
-    .option("--root <dir>", "project root (default: cwd)")
-    .action(
-      async (
-        file: string | undefined,
-        options: { feedback: string; root?: string },
-        command: Command,
-      ) => {
-        await refineStoredProposal(loadProject(rootOption(options, command)), {
-          file,
-          feedback: options.feedback,
-        });
-      },
-    );
-  propose
-    .command("select")
-    .description("append selected proposal items to BACKLOG and archive the artifact")
-    .requiredOption("--ids <ids>", "comma-separated proposal item ids, e.g. 1,3")
-    .option("--proposal <id-or-file>", "proposal id or JSON file (default: latest pending)")
-    .option("--root <dir>", "project root (default: cwd)")
-    .action(
-      async (options: { ids: string; proposal?: string; root?: string }, command: Command) => {
-        selectProposal(loadProject(rootOption(options, command)), options.ids, options.proposal);
+        const goal = goalParts.join(" ").trim();
+        if (options.ids && options.feedback) {
+          throw new Error("use --ids or --feedback, not both");
+        }
+        if (goal && (options.ids || options.feedback || options.proposal)) {
+          throw new Error(
+            "--proposal/--ids/--feedback manage pending proposals; use them without goal text",
+          );
+        }
+        if (options.fromQa && (goal || options.lenses)) {
+          throw new Error("--from-qa replaces the goal; use it without goal text or --lenses");
+        }
+        if (options.fromQa && (options.ids || options.feedback || options.proposal)) {
+          throw new Error("--from-qa drafts a new proposal; it cannot manage pending ones");
+        }
+        if (!goal && options.lenses) {
+          throw new Error('--lenses needs a goal, e.g. nightcrew propose --lenses "<goal>"');
+        }
+        const ctx = loadProject(rootOf(options));
+        if (options.fromQa) {
+          await runPropose(ctx, QA_TRIAGE_GOAL, { fromQa: true });
+        } else if (goal) {
+          await runPropose(ctx, goal, { lenses: options.lenses ?? false });
+        } else if (options.ids) {
+          selectProposal(ctx, options.ids, options.proposal);
+        } else if (options.feedback) {
+          await refineStoredProposal(ctx, { file: options.proposal, feedback: options.feedback });
+        } else {
+          await resumeProposals(ctx, { file: options.proposal });
+        }
       },
     );
 

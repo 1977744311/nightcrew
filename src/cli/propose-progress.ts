@@ -1,11 +1,12 @@
 import { clearLine, cursorTo, moveCursor } from "node:readline";
 import pc from "picocolors";
 import type { ProposalProgressEvent, ProposalProgressReporter } from "../proposals/generate";
-import { PROPOSAL_LENSES, type ProposalLens } from "../proposals/proposals";
+import type { ProposalLens } from "../proposals/proposals";
 
 export type ProposalProgressStream = NodeJS.WritableStream & { isTTY?: boolean };
 
 const LENS_NAMES: Record<ProposalLens, string> = {
+  balanced: "balanced",
   minimal_path: "minimal",
   architecture_first: "architecture",
   risk_first: "risk",
@@ -58,10 +59,9 @@ function plainProgress(event: ProposalProgressEvent): void {
 }
 
 class TtyProposalProgress {
-  private initialized = false;
-  private readonly statuses = new Map<ProposalLens, TtyStatus>(
-    PROPOSAL_LENSES.map((lens) => [lens, { kind: "pending" }]),
-  );
+  private renderedLines = 0;
+  /** Insertion-ordered: passes register on their first event (all start together). */
+  private readonly statuses = new Map<ProposalLens, TtyStatus>();
 
   constructor(private readonly stream: ProposalProgressStream) {}
 
@@ -86,15 +86,15 @@ class TtyProposalProgress {
   }
 
   private render(): void {
-    if (this.initialized) {
-      moveCursor(this.stream, 0, -PROPOSAL_LENSES.length);
+    if (this.renderedLines > 0) {
+      moveCursor(this.stream, 0, -this.renderedLines);
     }
-    this.initialized = true;
-    for (const lens of PROPOSAL_LENSES) {
+    for (const lens of this.statuses.keys()) {
       clearLine(this.stream, 0);
       cursorTo(this.stream, 0);
       this.stream.write(`${this.lineFor(lens)}\n`);
     }
+    this.renderedLines = this.statuses.size;
   }
 
   private lineFor(lens: ProposalLens): string {

@@ -7,8 +7,10 @@ import { aggregatePlanHistory, type PlanHistoryMetric } from "../plans/accountin
 import { listPlans } from "../plans/plans";
 import { type BudgetSummary, summarizeBudget } from "../policy/budget";
 import { listPendingProposals, type ProposalItem } from "../proposals/proposals";
+import { parseQuestions, type QuestionEntry } from "../questions/questions";
 import { readHistory } from "../state/history";
 import { readState } from "../state/state";
+import { readTextIfExists } from "../utils/fs";
 
 export interface ProjectSummary {
   name: string;
@@ -30,10 +32,13 @@ export interface ProjectDetail {
     paused: Array<Pick<PlanDoc, "id" | "title">>;
     completedCount: number;
   };
+  /** Open (unanswered) entries from questions.md — the operator decision inbox. */
+  questions: Array<Omit<QuestionEntry, "lines">>;
   proposals: Array<{
     id: string;
     goal: string;
     createdAt: string;
+    source?: "qa";
     items: Array<Pick<ProposalItem, "id" | "title" | "body" | "lens">>;
   }>;
   planMetrics: PlanHistoryMetric[];
@@ -112,10 +117,14 @@ export function detail(root: string): ProjectDetail {
       paused: listPlans(ctx.paths, "paused").map((plan) => ({ id: plan.id, title: plan.title })),
       completedCount: listPlans(ctx.paths, "completed").length,
     },
+    questions: parseQuestions(readTextIfExists(ctx.paths.questionsFile) ?? "")
+      .filter((entry) => !entry.checked && !entry.answer)
+      .map(({ lines: _lines, ...entry }) => entry),
     proposals: listPendingProposals(ctx.paths).map(({ proposal }) => ({
       id: proposal.id,
       goal: proposal.goal,
       createdAt: proposal.createdAt,
+      ...(proposal.source ? { source: proposal.source } : {}),
       items: proposal.items.map((item) => ({
         id: item.id,
         title: item.title,

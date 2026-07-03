@@ -71,7 +71,7 @@ export function printProposalSelectHint(
   options: { includeProposal?: boolean } = {},
 ): void {
   const proposalArg = options.includeProposal ? ` --proposal ${proposal.id}` : "";
-  console.log(pc.dim(`select with: nightcrew propose select --ids 1,3${proposalArg}`));
+  console.log(pc.dim(`select with: nightcrew propose --ids 1,3${proposalArg}`));
 }
 
 export function printProposalSelectionResult(

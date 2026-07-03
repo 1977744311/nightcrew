@@ -32,7 +32,7 @@ cd your-repo
 nightcrew init             # scaffolds .nightcrew/ and registers the project
 nightcrew doctor           # first-run sanity check: runtime, repo, config, registry, lock
 $EDITOR .nightcrew/crew.md # write rules + BACKLOG items
-nightcrew propose "goal"   # or: let 3 research passes draft the backlog, pick items in-terminal
+nightcrew propose "goal"   # or: draft ready-to-ratify BACKLOG items from a goal, pick in-terminal
 
 nightcrew run              # one supervised iteration, to build trust
 nightcrew loop             # a bounded unattended session (default 20 iterations)
@@ -64,12 +64,18 @@ nightcrew report           # the morning after
 .nightcrew/
   config.yaml        # the contract: provider, gates, guards, schedule
   crew.md            # your rules + BACKLOG (the only source of new work)
-  questions.md       # decisions awaiting you; escalations land here
-  qa.md              # optional acceptance notes per landed plan
+  questions.md       # 等你决策的问题，带可点选的字母选项
+  qa.md              # 你记录的缺陷；loop 会自动分诊成 proposal
   plans/             # active/ completed/ paused/ — one markdown file per plan
   runtime/           # state.json, history.jsonl, events.jsonl (git-ignored)
   worktrees/         # per-plan checkouts (git-ignored)
 ```
+
+早晨的例行动作收敛为 console 上的一个审批收件箱：open questions 会渲染
+出各自的选项（选中带排期标记的选项会直接把工作写进 BACKLOG；留下反馈
+则让 crew 下次运行重新起草选项），而 `qa.md` 里新增的缺陷 bullet 会在夜
+里被自动分诊成一份待审 proposal（候选修复项）等你批准。每一条 BACKLOG
+仍然能追溯到你的一次点击 — agent 永远不会写 `crew.md`。
 
 ## 命令
 
@@ -82,10 +88,10 @@ nightcrew report           # the morning after
 | `nightcrew status` | 查看 plans、streaks、worktrees、recent iterations |
 | `nightcrew report` | 早晨摘要：landed、failed、cost、open questions |
 | `nightcrew plan add <title>` | 创建 active plan 脚手架 |
-| `nightcrew propose "<goal>"` | 3 个 research passes 起草 BACKLOG candidates；通过 checkbox TUI、`propose select --ids` 或 console 选择 |
+| `nightcrew propose "<goal>"` | 单个 research pass 起草 BACKLOG candidates（`--lenses` 跑 3 个竞争 passes，`--from-qa` 从 qa.md 缺陷起草）；通过 checkbox TUI、`--ids 1,3` 或 console 选择。裸跑 `propose` 续审 pending 草稿；`--feedback "<text>"` 重新生成 |
 | `nightcrew plan list/show` | 查看 plans |
 | `nightcrew pause/resume` | 暂停 / 唤醒 loop（也可从 console 和 `crew` 操作） |
-| `nightcrew console` | 本地 web console：board、history、token curve、live events |
+| `nightcrew console` | 本地 web console：board、history、token curve、live events、question 与 proposal 审批 |
 | `nightcrew gc` | 清理 stale worktrees、sessions、old logs |
 | `crew start` | 跨所有已注册项目运行 daemon；`--console` 会带 actions 提供 UI |
 | `crew report` | 汇总所有已注册项目的 morning digest |

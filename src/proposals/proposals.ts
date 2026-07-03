@@ -6,7 +6,12 @@ import type { ModelTier, TokenUsage } from "../core/types";
 import { ensureDir, writeTextAtomic } from "../utils/fs";
 import { dateStamp, isoNow, slugify } from "../utils/id";
 
-export const PROPOSAL_LENSES = ["minimal_path", "architecture_first", "risk_first"] as const;
+/** The default proposal mode: one pass, no lens bias. */
+export const BALANCED_LENS = "balanced" as const;
+/** The opt-in research lenses (`propose --lenses`), run as concurrent passes. */
+export const RESEARCH_LENSES = ["minimal_path", "architecture_first", "risk_first"] as const;
+/** Every lens value a proposal item or pass may carry. */
+export const PROPOSAL_LENSES = [BALANCED_LENS, ...RESEARCH_LENSES] as const;
 export type ProposalLens = (typeof PROPOSAL_LENSES)[number];
 
 export const PROPOSAL_ARTIFACT_VERSION = 1;
@@ -39,6 +44,8 @@ export const proposalArtifactSchema = z.strictObject({
   status: z.literal("pending"),
   createdAt: z.string().min(1),
   routingTier: z.enum(["light", "heavy"]),
+  /** Set when the candidates were drafted from `.nightcrew/qa.md` defects. */
+  source: z.literal("qa").optional(),
   refinedFrom: z.string().min(1).optional(),
   feedback: z.string().min(1).optional(),
   items: z.array(proposalItemSchema),
@@ -67,6 +74,7 @@ export interface WriteProposalArtifactInput {
   items: CandidateProposalItem[];
   passes: Array<{ lens: ProposalLens; sessionId: string | null; usage: TokenUsage | null }>;
   id?: string;
+  source?: "qa";
   refinedFrom?: string;
   feedback?: string;
   now?: Date;
@@ -154,6 +162,7 @@ export function buildProposalArtifact(input: WriteProposalArtifactInput): Propos
     status: "pending",
     createdAt: isoNow(),
     routingTier: input.routingTier,
+    ...(input.source ? { source: input.source } : {}),
     ...(input.refinedFrom ? { refinedFrom: input.refinedFrom } : {}),
     ...(feedback ? { feedback } : {}),
     items: stableItems(input.items),

@@ -26,6 +26,10 @@ import {
 } from "./propose-progress";
 
 export type ProposeCommandOptions = ProposalSelectionOptions & {
+  /** Run the three research lenses concurrently instead of one balanced pass. */
+  lenses?: boolean;
+  /** Draft candidates from `.nightcrew/qa.md` defects instead of a goal. */
+  fromQa?: boolean;
   progress?: ProposalProgressReporter | false;
   progressRender?: ProposalProgressRenderOptions;
 };
@@ -36,7 +40,13 @@ function proposalProgress(options: ProposeCommandOptions): ProposalProgressRepor
 }
 
 function selectionOptions(options: ProposeCommandOptions): ProposalSelectionOptions {
-  const { progress: _progress, progressRender: _progressRender, ...selection } = options;
+  const {
+    lenses: _lenses,
+    fromQa: _fromQa,
+    progress: _progress,
+    progressRender: _progressRender,
+    ...selection
+  } = options;
   return selection;
 }
 
@@ -75,6 +85,8 @@ export async function runPropose(
     paths: ctx.paths,
     config: ctx.config,
     provider,
+    lenses: options.lenses ?? false,
+    fromQa: options.fromQa ?? false,
     onProgress: proposalProgress(options),
   });
   printProposalHeader(ctx, artifact, "created");
@@ -84,12 +96,8 @@ export async function runPropose(
   });
 }
 
-export function printProposalList(ctx: ProjectContext): void {
+function printProposalList(ctx: ProjectContext): void {
   const proposals = listPendingProposals(ctx.paths);
-  if (proposals.length === 0) {
-    console.log("no pending proposals");
-    return;
-  }
   for (const { file, proposal } of proposals) {
     const rel = relative(ctx.root, file).replaceAll("\\", "/");
     console.log(
@@ -106,12 +114,9 @@ export function selectProposal(ctx: ProjectContext, idsValue: string, proposal?:
 
 export async function reviewProposal(
   ctx: ProjectContext,
-  options: { file?: string; latest?: boolean },
+  options: { file?: string },
   commandOptions: ProposeCommandOptions = {},
 ): Promise<void> {
-  if (options.file && options.latest) {
-    throw new Error("use --latest or <file>, not both");
-  }
   const artifact = loadProposalArtifact(ctx.paths, options.file);
   printProposalHeader(ctx, artifact, "reviewing");
   await reviewProposalSelection(ctx, artifact, {
@@ -119,6 +124,29 @@ export async function reviewProposal(
     refineOnEmpty: withFeedbackRefinement(ctx, undefined, commandOptions),
     ...selectionOptions(commandOptions),
   });
+}
+
+/** Bare `nightcrew propose`: list pending drafts and reopen the latest (or targeted) one. */
+export async function resumeProposals(
+  ctx: ProjectContext,
+  options: { file?: string } = {},
+  commandOptions: ProposeCommandOptions = {},
+): Promise<void> {
+  if (options.file) {
+    await reviewProposal(ctx, { file: options.file }, commandOptions);
+    return;
+  }
+  if (listPendingProposals(ctx.paths).length === 0) {
+    console.log('no pending proposals; draft one with `nightcrew propose "<goal>"`');
+    return;
+  }
+  printProposalList(ctx);
+  const isTty = commandOptions.isTty ?? process.stdout.isTTY === true;
+  if (!isTty) {
+    console.log(pc.dim("review with: nightcrew propose --proposal <id>"));
+    return;
+  }
+  await reviewProposal(ctx, {}, commandOptions);
 }
 
 export async function refineStoredProposal(

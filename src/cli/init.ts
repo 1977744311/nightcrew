@@ -86,13 +86,14 @@ an empty backlog means the crew idles instead of inventing work.
 
 const QUESTIONS_TEMPLATE = `# Open Questions
 
-Decisions waiting for the operator. The crew appends; you answer by editing
-the item, then garden prunes it.
+Decisions waiting for the operator. The crew appends entries with lettered
+options; answer from the console (or edit here), then garden prunes.
 `;
 
 const QA_TEMPLATE = `# QA
 
-Defects observed by you or the crew. Executable, specific, disposable.
+Defects observed by you or the crew — one \`- \` bullet per defect.
+The loop triages new bullets into proposal candidates for your approval.
 `;
 
 const IGNORE_ENTRIES = [".nightcrew/runtime/", ".nightcrew/worktrees/"];

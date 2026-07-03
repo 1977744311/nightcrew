@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/program";
 import { renderProposalItemPreview } from "../src/cli/proposal-selection";
-import { reviewProposal, runPropose } from "../src/cli/propose";
+import { resumeProposals, reviewProposal, runPropose } from "../src/cli/propose";
 import { createProposalProgressReporter } from "../src/cli/propose-progress";
 import {
   generateProposal,
@@ -67,9 +67,10 @@ function escapeRegex(value: string): string {
 }
 
 function lensFromPrompt(prompt: string): ProposalLens {
-  if (prompt.includes("minimal path")) return "minimal_path";
-  if (prompt.includes("architecture-first")) return "architecture_first";
-  if (prompt.includes("risk-first")) return "risk_first";
+  if (prompt.includes("minimal path:")) return "minimal_path";
+  if (prompt.includes("architecture-first:")) return "architecture_first";
+  if (prompt.includes("risk-first:")) return "risk_first";
+  if (prompt.includes("balanced:")) return "balanced";
   throw new Error(`could not identify proposal lens from prompt: ${prompt}`);
 }
 
@@ -109,24 +110,42 @@ function deferredProvider(): {
   };
 }
 
+function balancedScriptEntries(model: string) {
+  return [
+    {
+      match: "balanced:",
+      structuredOutput: {
+        candidates: [
+          candidate("Minimal candidate", "minimal"),
+          candidate("Architecture candidate", "architecture"),
+          candidate("Risk candidate", "risk"),
+        ],
+      },
+      requireOutputSchema: true,
+      expectReadOnly: true,
+      expectModel: model,
+    },
+  ];
+}
+
 function proposalScriptEntries(model: string) {
   return [
     {
-      match: "minimal path",
+      match: "minimal path:",
       structuredOutput: { candidates: [candidate("Minimal candidate", "minimal")] },
       requireOutputSchema: true,
       expectReadOnly: true,
       expectModel: model,
     },
     {
-      match: "architecture-first",
+      match: "architecture-first:",
       structuredOutput: { candidates: [candidate("Architecture candidate", "architecture")] },
       requireOutputSchema: true,
       expectReadOnly: true,
       expectModel: model,
     },
     {
-      match: "risk-first",
+      match: "risk-first:",
       structuredOutput: { candidates: [candidate("Risk candidate", "risk")] },
       requireOutputSchema: true,
       expectReadOnly: true,
@@ -145,24 +164,14 @@ function refinementScriptEntries(input: {
   const previousSummary = `Previous candidate summaries:.*1\\. ${previousTitle} \\[minimal_path\\]`;
   return [
     {
-      match: `(?=.*minimal path)(?=.*${previousSummary})(?=.*Operator feedback:.*${feedback})`,
-      structuredOutput: { candidates: [candidate("Refined minimal", "refined minimal")] },
-      requireOutputSchema: true,
-      expectReadOnly: true,
-      expectModel: input.model,
-    },
-    {
-      match: `(?=.*architecture-first)(?=.*${previousSummary})(?=.*Operator feedback:.*${feedback})`,
+      match: `(?=.*balanced:)(?=.*${previousSummary})(?=.*Operator feedback:.*${feedback})`,
       structuredOutput: {
-        candidates: [candidate("Refined architecture", "refined architecture")],
+        candidates: [
+          candidate("Refined minimal", "refined minimal"),
+          candidate("Refined architecture", "refined architecture"),
+          candidate("Refined risk", "refined risk"),
+        ],
       },
-      requireOutputSchema: true,
-      expectReadOnly: true,
-      expectModel: input.model,
-    },
-    {
-      match: `(?=.*risk-first)(?=.*${previousSummary})(?=.*Operator feedback:.*${feedback})`,
-      structuredOutput: { candidates: [candidate("Refined risk", "refined risk")] },
       requireOutputSchema: true,
       expectReadOnly: true,
       expectModel: input.model,
@@ -197,7 +206,56 @@ describe("nightcrew propose", () => {
     );
   });
 
-  it("generates one stable artifact from three structured read-only fake-provider passes", async () => {
+  it("generates one stable artifact from a single balanced read-only pass by default", async () => {
+    project = await makeTempProject();
+    project.setConfig({
+      provider: {
+        default: "fake",
+        fake: { script: project.scriptFile },
+        codex: { tiers: { heavy: "proposal-heavy" } },
+      },
+      routing: { propose: "heavy" },
+    });
+    project.setScript(balancedScriptEntries("proposal-heavy"));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-03T09:00:00.000Z"));
+
+    const output = await captureConsole(() =>
+      runCli(["propose", "Add proposal workflow", "--root", project?.root ?? ""]),
+    );
+
+    const relPath = ".nightcrew/proposals/2026-07-03-add-proposal-workflow.json";
+    const file = join(project.root, relPath);
+    expect(output.stderr).toBe("");
+    expect(output.stdout).toContain("proposal pass balanced started");
+    expect(output.stdout).toContain("proposal pass balanced completed");
+    expect(output.stdout).not.toContain("proposal pass minimal_path");
+    expect(output.stdout).toContain(`created ${relPath}`);
+    expect(output.stdout).toContain("1. Minimal candidate");
+    expect(output.stdout).toContain("3. Risk candidate");
+    expect(output.stdout).toContain("select with: nightcrew propose --ids 1,3");
+
+    const artifact = readProposalArtifact(file);
+    expect(artifact).toMatchObject({
+      version: 1,
+      id: "2026-07-03-add-proposal-workflow",
+      goal: "Add proposal workflow",
+      status: "pending",
+      routingTier: "heavy",
+    });
+    expect(artifact.items.map((item) => item.id)).toEqual(["1", "2", "3"]);
+    expect(artifact.items.map((item) => item.lens)).toEqual(["balanced", "balanced", "balanced"]);
+    expect(artifact.passes).toHaveLength(1);
+    expect(artifact.passes[0]?.lens).toBe("balanced");
+
+    project.setScript(balancedScriptEntries("proposal-heavy"));
+    await captureConsole(() =>
+      runCli(["propose", "Add proposal workflow", "--root", project?.root ?? ""]),
+    );
+    expect(listPendingProposals(project.ctx().paths).map((entry) => entry.file)).toEqual([file]);
+  });
+
+  it("runs the three research passes concurrently with --lenses", async () => {
     project = await makeTempProject();
     project.setConfig({
       provider: {
@@ -209,43 +267,26 @@ describe("nightcrew propose", () => {
     });
     project.setScript(proposalScriptEntries("proposal-heavy"));
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-03T09:00:00.000Z"));
+    vi.setSystemTime(new Date("2026-07-03T09:05:00.000Z"));
 
     const output = await captureConsole(() =>
-      runCli(["propose", "Add proposal workflow", "--root", project?.root ?? ""]),
+      runCli(["propose", "Add lensed workflow", "--lenses", "--root", project?.root ?? ""]),
     );
 
-    const relPath = ".nightcrew/proposals/2026-07-03-add-proposal-workflow.json";
+    const relPath = ".nightcrew/proposals/2026-07-03-add-lensed-workflow.json";
     const file = join(project.root, relPath);
     expect(output.stderr).toBe("");
     expect(output.stdout).toContain("proposal pass minimal_path started");
     expect(output.stdout).toContain("proposal pass risk_first completed");
     expect(output.stdout).toContain(`created ${relPath}`);
-    expect(output.stdout).toContain("1. Minimal candidate");
-    expect(output.stdout).toContain("3. Risk candidate");
-    expect(output.stdout).toContain("select with: nightcrew propose select --ids 1,3");
 
     const artifact = readProposalArtifact(file);
-    expect(artifact).toMatchObject({
-      version: 1,
-      id: "2026-07-03-add-proposal-workflow",
-      goal: "Add proposal workflow",
-      status: "pending",
-      routingTier: "heavy",
-    });
-    expect(artifact.items.map((item) => item.id)).toEqual(["1", "2", "3"]);
     expect(artifact.items.map((item) => item.lens)).toEqual([
       "minimal_path",
       "architecture_first",
       "risk_first",
     ]);
     expect(artifact.passes).toHaveLength(3);
-
-    project.setScript(proposalScriptEntries("proposal-heavy"));
-    await captureConsole(() =>
-      runCli(["propose", "Add proposal workflow", "--root", project?.root ?? ""]),
-    );
-    expect(listPendingProposals(project.ctx().paths).map((entry) => entry.file)).toEqual([file]);
   });
 
   it("keeps candidate numbering in lens order when concurrent passes finish out of order", async () => {
@@ -259,6 +300,7 @@ describe("nightcrew propose", () => {
       paths: project.ctx().paths,
       config: project.ctx().config,
       provider: deferred.provider,
+      lenses: true,
       onProgress: (event) => events.push(event),
     });
 
@@ -310,6 +352,7 @@ describe("nightcrew propose", () => {
       paths: project.ctx().paths,
       config: project.ctx().config,
       provider: deferred.provider,
+      lenses: true,
       onProgress: (event) => events.push(event),
     });
 
@@ -361,6 +404,28 @@ describe("nightcrew propose", () => {
     expect(output).toContain("failed 2.0s: bad output");
   });
 
+  it("renders a single TTY progress line for the default balanced pass", () => {
+    const writes: string[] = [];
+    const stream = {
+      isTTY: true,
+      write: (chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+      },
+    } as NodeJS.WritableStream & { isTTY: boolean };
+    const progress = createProposalProgressReporter({ isTty: true, stream });
+
+    progress({ kind: "start", lens: "balanced" });
+    progress({ kind: "finish", lens: "balanced", elapsedMs: 900, candidateCount: 3 });
+
+    const output = writes.join("");
+    expect(output).toContain("proposal balanced");
+    expect(output).toContain("completed 0.9s (3 candidates)");
+    expect(output).not.toContain("proposal minimal");
+    expect(output).not.toContain("proposal architecture");
+    expect(output).not.toContain("proposal risk");
+  });
+
   it("passes the propose web-search override and includes external research guidance", async () => {
     project = await makeTempProject();
     project.setConfig({
@@ -398,8 +463,9 @@ describe("nightcrew propose", () => {
       provider,
     });
 
-    expect(runs).toHaveLength(3);
-    expect(runs.map((run) => run.webSearchMode)).toEqual(["live", "live", "live"]);
+    expect(runs).toHaveLength(1);
+    expect(runs.map((run) => run.webSearchMode)).toEqual(["live"]);
+    expect(runs[0]?.prompt).toContain("balanced:");
     expect(runs[0]?.prompt).toContain("## External Ecosystem Research");
     expect(runs[0]?.prompt).toContain("run web searches first before proposing candidates");
     expect(runs[0]?.prompt).toContain(
@@ -428,12 +494,8 @@ describe("nightcrew propose", () => {
       provider,
     });
 
-    expect(prompts).toHaveLength(3);
-    expect(prompts.map(lensFromPrompt)).toEqual([
-      "minimal_path",
-      "architecture_first",
-      "risk_first",
-    ]);
+    expect(prompts).toHaveLength(1);
+    expect(prompts.map(lensFromPrompt)).toEqual(["balanced"]);
     for (const prompt of prompts) {
       expect(prompt).toContain("## Language");
       expect(prompt).toContain(
@@ -472,12 +534,8 @@ describe("nightcrew propose", () => {
       provider,
     });
 
-    expect(prompts).toHaveLength(3);
-    expect(prompts.map(lensFromPrompt)).toEqual([
-      "minimal_path",
-      "architecture_first",
-      "risk_first",
-    ]);
+    expect(prompts).toHaveLength(1);
+    expect(prompts.map(lensFromPrompt)).toEqual(["balanced"]);
     for (const prompt of prompts) {
       expect(prompt).toContain("## Language");
       expect(prompt).toContain(
@@ -489,6 +547,49 @@ describe("nightcrew propose", () => {
     }
   });
 
+  it("reruns the research lenses on refine when the source artifact recorded them", async () => {
+    project = await makeTempProject();
+    const source = writeProposalArtifact(project.ctx().paths, {
+      goal: "Keep lensed research on refinement",
+      routingTier: "light",
+      passes: [
+        { lens: "minimal_path", sessionId: null, usage: null },
+        { lens: "architecture_first", sessionId: null, usage: null },
+        { lens: "risk_first", sessionId: null, usage: null },
+      ],
+      items: [{ ...candidate("Source minimal", "source minimal"), lens: "minimal_path" }],
+    });
+    const prompts: string[] = [];
+    const provider: Provider = {
+      name: "capture",
+      run: async (options) => {
+        prompts.push(options.prompt);
+        const lens = lensFromPrompt(options.prompt);
+        return proposalRunResult(lens, `Refined lensed ${prompts.length}`);
+      },
+    };
+
+    const result = await refineProposal({
+      source,
+      feedback: "Keep researching through all three lenses.",
+      root: project.root,
+      paths: project.ctx().paths,
+      config: project.ctx().config,
+      provider,
+    });
+
+    expect(prompts.map(lensFromPrompt)).toEqual([
+      "minimal_path",
+      "architecture_first",
+      "risk_first",
+    ]);
+    expect(result.artifact.proposal.passes.map((pass) => pass.lens)).toEqual([
+      "minimal_path",
+      "architecture_first",
+      "risk_first",
+    ]);
+  });
+
   it("selects generated proposal items through the interactive helper and archives the artifact", async () => {
     project = await makeTempProject();
     project.setConfig({
@@ -498,7 +599,7 @@ describe("nightcrew propose", () => {
         codex: { tiers: { light: "proposal-light" } },
       },
     });
-    project.setScript(proposalScriptEntries("proposal-light"));
+    project.setScript(balancedScriptEntries("proposal-light"));
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-03T09:30:00.000Z"));
 
@@ -524,10 +625,9 @@ describe("nightcrew propose", () => {
     expect(output.stderr).toBe("");
     expect(output.stdout).toContain(`created ${relPath}`);
     expect(stdoutBeforePrompt).not.toContain("1. Minimal candidate");
-    expect(stdoutBeforePrompt).not.toContain("source lens: minimal_path");
+    expect(stdoutBeforePrompt).not.toContain("source lens:");
     expect(stdoutBeforePrompt).not.toContain(candidate("Minimal candidate", "minimal").body);
     expect(stdoutBeforePrompt).not.toContain("3. Risk candidate");
-    expect(stdoutBeforePrompt).not.toContain("source lens: risk_first");
     expect(stdoutBeforePrompt).not.toContain(candidate("Risk candidate", "risk").body);
     expect(output.stdout).toContain("selected 1 item");
     expect(output.stdout).toContain("archived .nightcrew/proposals/archive/");
@@ -574,7 +674,7 @@ describe("nightcrew propose", () => {
     );
 
     const output = await captureConsole(() =>
-      runCli(["propose", "refine", "--feedback", feedback, "--root", project?.root ?? ""]),
+      runCli(["propose", "--feedback", feedback, "--root", project?.root ?? ""]),
     );
 
     const refinedFile = join(
@@ -596,7 +696,7 @@ describe("nightcrew propose", () => {
     );
     expect(output.stdout).toContain("1. Refined minimal");
     expect(output.stdout).toContain(
-      `select with: nightcrew propose select --ids 1,3 --proposal ${latest.proposal.id}-refined`,
+      `select with: nightcrew propose --ids 1,3 --proposal ${latest.proposal.id}-refined`,
     );
     expect(refined).toMatchObject({
       id: `${latest.proposal.id}-refined`,
@@ -606,12 +706,9 @@ describe("nightcrew propose", () => {
       refinedFrom: latest.proposal.id,
       feedback,
     });
-    expect(refined.items.map((item) => item.lens)).toEqual([
-      "minimal_path",
-      "architecture_first",
-      "risk_first",
-    ]);
-    expect(refined.passes).toHaveLength(3);
+    expect(refined.items.map((item) => item.lens)).toEqual(["balanced", "balanced", "balanced"]);
+    expect(refined.passes).toHaveLength(1);
+    expect(refined.passes[0]?.lens).toBe("balanced");
     expect(existsSync(older.file)).toBe(true);
     expect(existsSync(latest.file)).toBe(false);
     expect(existsSync(archivedSource)).toBe(true);
@@ -695,16 +792,15 @@ describe("nightcrew propose", () => {
       ],
     });
 
-    const listed = await captureConsole(() =>
-      runCli(["propose", "list", "--root", project?.root ?? ""]),
-    );
+    const listed = await captureConsole(() => runCli(["propose", "--root", project?.root ?? ""]));
     expect(listed.stdout).toContain(proposal.id);
     expect(listed.stdout).toContain("3 items");
     expect(listed.stdout).toContain("Refine proposals");
+    expect(listed.stdout).toContain("review with: nightcrew propose --proposal <id>");
 
     const beforeCrew = readFileSync(project.ctx().paths.crewFile, "utf8");
     const selected = await captureConsole(() =>
-      runCli(["propose", "select", "--ids", "1,3", "--root", project?.root ?? ""]),
+      runCli(["propose", "--ids", "1,3", "--root", project?.root ?? ""]),
     );
 
     const crew = readFileSync(project.ctx().paths.crewFile, "utf8");
@@ -721,9 +817,55 @@ describe("nightcrew propose", () => {
     );
 
     const afterList = await captureConsole(() =>
-      runCli(["propose", "list", "--root", project?.root ?? ""]),
+      runCli(["propose", "--root", project?.root ?? ""]),
     );
-    expect(afterList.stdout).toBe("no pending proposals");
+    expect(afterList.stdout).toBe(
+      'no pending proposals; draft one with `nightcrew propose "<goal>"`',
+    );
+  });
+
+  it("resumes the latest pending proposal with the picker on bare TTY propose", async () => {
+    project = await makeTempProject();
+    project.setCrew(["Keep existing backlog item"]);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-03T10:15:00.000Z"));
+    const older = writeProposalArtifact(project.ctx().paths, {
+      goal: "A older pending proposal",
+      routingTier: "light",
+      passes: [],
+      items: [{ ...candidate("Older item", "older"), lens: "minimal_path" }],
+    });
+    const latest = writeProposalArtifact(project.ctx().paths, {
+      goal: "Z latest pending proposal",
+      routingTier: "light",
+      passes: [],
+      items: [{ ...candidate("Latest item", "latest"), lens: "minimal_path" }],
+    });
+
+    const promptedProposalIds: string[] = [];
+    const output = await captureConsole(async () => {
+      await resumeProposals(
+        requireProject().ctx(),
+        {},
+        {
+          isTty: true,
+          prompt: async (current) => {
+            promptedProposalIds.push(current.id);
+            return ["1"];
+          },
+        },
+      );
+    });
+
+    expect(output.stderr).toBe("");
+    expect(output.stdout).toContain(older.proposal.id);
+    expect(output.stdout).toContain(latest.proposal.id);
+    expect(promptedProposalIds).toEqual([latest.proposal.id]);
+    expect(output.stdout).toContain(`selected 1 item from ${latest.proposal.id}`);
+    const crew = readFileSync(project.ctx().paths.crewFile, "utf8");
+    expect(crew).toContain(candidate("Latest item", "latest").body);
+    expect(existsSync(latest.file)).toBe(false);
+    expect(existsSync(older.file)).toBe(true);
   });
 
   it("reviews stored proposals in non-TTY mode without changing crew.md", async () => {
@@ -743,7 +885,7 @@ describe("nightcrew propose", () => {
     const beforeCrew = readFileSync(project.ctx().paths.crewFile, "utf8");
 
     const latest = await captureConsole(() =>
-      runCli(["propose", "review", "--latest", "--root", project?.root ?? ""]),
+      runCli(["propose", "--proposal", proposal.id, "--root", project?.root ?? ""]),
     );
     expect(latest.stderr).toBe("");
     expect(latest.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
@@ -752,13 +894,13 @@ describe("nightcrew propose", () => {
     expect(latest.stdout).toContain(candidate("Review first", "first").body);
     expect(latest.stdout).not.toContain("source lens:");
     expect(latest.stdout).toContain(
-      `select with: nightcrew propose select --ids 1,3 --proposal ${proposal.id}`,
+      `select with: nightcrew propose --ids 1,3 --proposal ${proposal.id}`,
     );
     expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
     expect(existsSync(file)).toBe(true);
 
     const byFile = await captureConsole(() =>
-      runCli(["propose", "review", file, "--root", project?.root ?? ""]),
+      runCli(["propose", "--proposal", file, "--root", project?.root ?? ""]),
     );
     expect(byFile.stderr).toBe("");
     expect(byFile.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
@@ -814,7 +956,7 @@ describe("nightcrew propose", () => {
     project = await makeTempProject();
     project.setScript([
       {
-        match: "minimal path",
+        match: "balanced:",
         status: "error",
         errorMessage: "research failed",
       },
@@ -825,9 +967,9 @@ describe("nightcrew propose", () => {
     );
 
     expect(process.exitCode).toBe(1);
-    expect(output.stdout).toContain("proposal pass minimal_path started");
-    expect(output.stdout).toContain("proposal pass minimal_path failed");
-    expect(output.stderr).toContain("proposal pass minimal_path failed");
+    expect(output.stdout).toContain("proposal pass balanced started");
+    expect(output.stdout).toContain("proposal pass balanced failed");
+    expect(output.stderr).toContain("proposal pass balanced failed");
     expect(listPendingProposals(project.ctx().paths)).toEqual([]);
   });
 
@@ -842,12 +984,98 @@ describe("nightcrew propose", () => {
     const beforeCrew = readFileSync(project.ctx().paths.crewFile, "utf8");
 
     const output = await captureConsole(() =>
-      runCli(["propose", "select", "--ids", "2", "--root", project?.root ?? ""]),
+      runCli(["propose", "--ids", "2", "--root", project?.root ?? ""]),
     );
 
     expect(process.exitCode).toBe(1);
     expect(output.stderr).toContain("proposal item id(s) not found: 2");
     expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
     expect(existsSync(file)).toBe(true);
+  });
+
+  it("rejects conflicting propose flag combinations", async () => {
+    project = await makeTempProject();
+
+    const goalWithFlags = await captureConsole(() =>
+      runCli(["propose", "New goal", "--ids", "1", "--root", project?.root ?? ""]),
+    );
+    expect(process.exitCode).toBe(1);
+    expect(goalWithFlags.stderr).toContain("manage pending proposals");
+    process.exitCode = undefined;
+
+    const idsWithFeedback = await captureConsole(() =>
+      runCli(["propose", "--ids", "1", "--feedback", "smaller", "--root", project?.root ?? ""]),
+    );
+    expect(process.exitCode).toBe(1);
+    expect(idsWithFeedback.stderr).toContain("use --ids or --feedback, not both");
+    process.exitCode = undefined;
+
+    const lensesWithoutGoal = await captureConsole(() =>
+      runCli(["propose", "--lenses", "--root", project?.root ?? ""]),
+    );
+    expect(process.exitCode).toBe(1);
+    expect(lensesWithoutGoal.stderr).toContain("--lenses needs a goal");
+    process.exitCode = undefined;
+
+    const qaWithGoal = await captureConsole(() =>
+      runCli(["propose", "Some goal", "--from-qa", "--root", project?.root ?? ""]),
+    );
+    expect(process.exitCode).toBe(1);
+    expect(qaWithGoal.stderr).toContain("--from-qa replaces the goal");
+    process.exitCode = undefined;
+
+    const qaWithIds = await captureConsole(() =>
+      runCli(["propose", "--from-qa", "--ids", "1", "--root", project?.root ?? ""]),
+    );
+    expect(process.exitCode).toBe(1);
+    expect(qaWithIds.stderr).toContain("--from-qa drafts a new proposal");
+  });
+
+  it("drafts qa.md defects into a qa-sourced proposal with --from-qa", async () => {
+    project = await makeTempProject();
+    writeFileSync(
+      join(project.root, ".nightcrew", "qa.md"),
+      "# QA\n\n- login crashes on empty password\n- logout button dead on Safari\n",
+    );
+    project.setScript([
+      {
+        match: "QA Inbox",
+        structuredOutput: {
+          candidates: [candidate("Fix login crash", "qa")],
+        },
+        requireOutputSchema: true,
+        expectReadOnly: true,
+      },
+    ]);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-03T09:10:00.000Z"));
+
+    const output = await captureConsole(() =>
+      runCli(["propose", "--from-qa", "--root", project?.root ?? ""]),
+    );
+
+    const file = join(project.root, ".nightcrew/proposals/2026-07-03-qa-triage.json");
+    expect(output.stderr).toBe("");
+    expect(output.stdout).toContain("1. Fix login crash");
+
+    const artifact = readProposalArtifact(file);
+    expect(artifact).toMatchObject({
+      goal: "qa triage",
+      source: "qa",
+      status: "pending",
+    });
+    expect(artifact.passes.map((pass) => pass.lens)).toEqual(["balanced"]);
+  });
+
+  it("fails --from-qa fast when qa.md has no defect bullets", async () => {
+    project = await makeTempProject();
+
+    const output = await captureConsole(() =>
+      runCli(["propose", "--from-qa", "--root", project?.root ?? ""]),
+    );
+
+    expect(process.exitCode).toBe(1);
+    expect(output.stderr).toContain("qa.md has no defect bullets");
+    expect(listPendingProposals(project.ctx().paths)).toEqual([]);
   });
 });

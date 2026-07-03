@@ -2,6 +2,7 @@ import type { ProjectContext } from "../config/load";
 import { resolveOperation } from "../core/operations";
 import type { IterationRecord } from "../core/types";
 import { type RunnerDeps, runIteration } from "../loop/runner";
+import { maybeTriageQa } from "../loop/triage";
 import { findPlan } from "../plans/plans";
 import { emitEvent } from "../state/events";
 import { acquireProjectLock } from "../state/lock";
@@ -158,6 +159,9 @@ export async function runProjectScheduler(
           s.stop = undefined;
         });
       }
+
+      // New qa.md defects become a pending proposal (read-only, self-guarded).
+      await maybeTriageQa(ctx, deps.provider);
 
       // Reap finished lanes (explicit flag: racing a settled promise against
       // Promise.resolve() is order-dependent and must never gate this).

@@ -46,7 +46,7 @@ cd your-repo
 nightcrew init             # scaffolds .nightcrew/ and registers the project
 nightcrew doctor           # first-run sanity check: runtime, repo, config, registry, lock
 $EDITOR .nightcrew/crew.md # write rules + BACKLOG items
-nightcrew propose "goal"   # or: let 3 research passes draft the backlog, pick items in-terminal
+nightcrew propose "goal"   # or: draft ready-to-ratify BACKLOG items from a goal, pick in-terminal
 
 nightcrew run              # one supervised iteration, to build trust
 nightcrew loop             # a bounded unattended session (default 20 iterations)
@@ -96,12 +96,19 @@ Everything you and the crew say to each other lives in markdown, in your repo:
 .nightcrew/
   config.yaml        # the contract: provider, gates, guards, schedule
   crew.md            # your rules + BACKLOG (the only source of new work)
-  questions.md       # decisions awaiting you; escalations land here
-  qa.md              # optional acceptance notes per landed plan
+  questions.md       # decisions awaiting you, with lettered options to pick from
+  qa.md              # defects you record; the loop triages them into proposals
   plans/             # active/ completed/ paused/ — one markdown file per plan
   runtime/           # state.json, history.jsonl, events.jsonl (git-ignored)
   worktrees/         # per-plan checkouts (git-ignored)
 ```
+
+The morning routine is one approval inbox in the console: open questions
+render their options (answering can schedule the chosen option straight
+into BACKLOG; leaving feedback makes the crew redraft options next run),
+and new `qa.md` defect bullets are auto-triaged overnight into a pending
+proposal of fix candidates for you to approve. Every BACKLOG line still
+traces back to one of your clicks — agents never write `crew.md`.
 
 ## Commands
 
@@ -114,10 +121,10 @@ Everything you and the crew say to each other lives in markdown, in your repo:
 | `nightcrew status` | Plans, streaks, worktrees, recent iterations |
 | `nightcrew report` | Morning digest: landed, failed, cost, open questions |
 | `nightcrew plan add <title>` | Create an active plan scaffold |
-| `nightcrew propose "<goal>"` | 3 research passes draft BACKLOG candidates; pick via checkbox TUI, `propose select --ids`, or the console |
+| `nightcrew propose "<goal>"` | One research pass drafts BACKLOG candidates (`--lenses` runs 3 competing passes, `--from-qa` drafts from qa.md defects); pick via checkbox TUI, `--ids 1,3`, or the console. Bare `propose` resumes pending drafts; `--feedback "<text>"` regenerates |
 | `nightcrew plan list/show` | Inspect plans |
 | `nightcrew pause/resume` | Suspend / wake the loop (also from console and `crew`) |
-| `nightcrew console` | Local web console: board, history, token curve, live events |
+| `nightcrew console` | Local web console: board, history, token curve, live events, question + proposal approvals |
 | `nightcrew gc` | Clean stale worktrees, sessions, old logs |
 | `crew start` | Daemon across all registered projects; `--console` serves the UI with actions |
 | `crew report` | Aggregate the morning digest across all registered projects |

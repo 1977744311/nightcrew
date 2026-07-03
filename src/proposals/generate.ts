@@ -6,21 +6,25 @@ import { readTextIfExists } from "../utils/fs";
 import type { ProposalArtifact } from "./proposals";
 import {
   archiveProposal,
+  BALANCED_LENS,
   nextRefinedProposalId,
-  PROPOSAL_LENSES,
   type ProposalArtifactFile,
   type ProposalLens,
   type ProposalPass,
+  RESEARCH_LENSES,
   writeProposalArtifact,
 } from "./proposals";
 
 const LENS_LABELS: Record<ProposalLens, string> = {
+  balanced: "balanced",
   minimal_path: "minimal path",
   architecture_first: "architecture-first",
   risk_first: "risk-first",
 };
 
 const LENS_INSTRUCTIONS: Record<ProposalLens, string> = {
+  balanced:
+    "Weigh the smallest useful seam, durable structure, and risk burn-down together; recommend the strongest overall candidates.",
   minimal_path:
     "Prefer the smallest useful seam that can land quickly with clear tests and minimal churn.",
   architecture_first:
@@ -28,6 +32,24 @@ const LENS_INSTRUCTIONS: Record<ProposalLens, string> = {
   risk_first:
     "Prefer the candidate that burns down operational, correctness, migration, or testability risk first.",
 };
+
+/** Single balanced pass by default; the three research lenses on `--lenses`. */
+function lensesFor(useResearchLenses: boolean): readonly ProposalLens[] {
+  return useResearchLenses ? RESEARCH_LENSES : [BALANCED_LENS];
+}
+
+/** Goal label carried by qa-sourced proposal artifacts. */
+export const QA_TRIAGE_GOAL = "qa triage";
+
+/**
+ * The defect bullets of `.nightcrew/qa.md` (one `- ` bullet per defect by
+ * convention). Null when the file has no bullets — nothing to triage.
+ */
+export function qaDefectBullets(text: string | null): string | null {
+  if (!text) return null;
+  const bullets = text.split("\n").filter((line) => /^\s*[-*]\s+\S/.test(line));
+  return bullets.length > 0 ? bullets.join("\n") : null;
+}
 
 export const PROPOSAL_OUTPUT_SCHEMA = {
   type: "object",
@@ -66,6 +88,10 @@ export interface GenerateProposalOptions {
   paths: ProjectPaths;
   config: NightcrewConfig;
   provider: Provider;
+  /** Run the three research lenses concurrently instead of one balanced pass. */
+  lenses?: boolean;
+  /** Draft candidates from `.nightcrew/qa.md` defects instead of an operator goal. */
+  fromQa?: boolean;
   onProgress?: ProposalProgressReporter;
 }
 
@@ -162,6 +188,7 @@ function proposalPrompt(input: {
   projectName: string;
   lens: ProposalLens;
   crew: string;
+  qaInbox?: string;
   refinement?: {
     source: ProposalArtifact;
     feedback: string;
@@ -172,11 +199,25 @@ function proposalPrompt(input: {
     "This is a read-only proposal pass. Inspect the repository if needed, but do not modify files.",
     "Use a fresh, independent judgment for this pass.",
     "",
-    `## Operator Goal`,
-    "",
-    input.goal,
-    "",
   ];
+
+  if (input.qaInbox) {
+    lines.push(
+      "## QA Inbox (operator-recorded defects to triage)",
+      "",
+      "```md",
+      input.qaInbox.trim(),
+      "```",
+      "",
+      "Convert the actionable defects above into BACKLOG candidates: merge duplicates,",
+      "skip defects already covered by an existing BACKLOG item in the operator surface",
+      "below, and when a defect has competing fix strategies, emit them as separate",
+      "candidates stating the trade-off in each rationale.",
+      "",
+    );
+  } else {
+    lines.push("## Operator Goal", "", input.goal, "");
+  }
 
   if (input.refinement) {
     lines.push(
@@ -196,12 +237,15 @@ function proposalPrompt(input: {
     );
   }
 
+  const languageSource = input.refinement
+    ? "operator feedback"
+    : input.qaInbox
+      ? "QA inbox entries"
+      : "operator goal text";
   lines.push(
     "## Language",
     "",
-    input.refinement
-      ? "- Write every candidate `title`, `body`, and `rationale` in the same language as the operator feedback."
-      : "- Write every candidate `title`, `body`, and `rationale` in the same language as the operator goal text.",
+    `- Write every candidate \`title\`, \`body\`, and \`rationale\` in the same language as the ${languageSource}.`,
     "- Preserve the BACKLOG checkbox formatting rules below regardless of language.",
     "",
   );
@@ -250,6 +294,8 @@ async function runProposalPasses(options: {
   paths: ProjectPaths;
   config: NightcrewConfig;
   provider: Provider;
+  lenses: readonly ProposalLens[];
+  qaInbox?: string;
   onProgress?: ProposalProgressReporter;
   refinement?: {
     source: ProposalArtifact;
@@ -265,12 +311,12 @@ async function runProposalPasses(options: {
   const crew = readTextIfExists(options.paths.crewFile) ?? "";
   const startedAt = new Map<ProposalLens, number>();
 
-  for (const lens of PROPOSAL_LENSES) {
+  for (const lens of options.lenses) {
     startedAt.set(lens, nowMs());
     options.onProgress?.({ kind: "start", lens });
   }
 
-  const jobs = PROPOSAL_LENSES.map(async (lens) => {
+  const jobs = options.lenses.map(async (lens) => {
     try {
       const result = await options.provider.run({
         prompt: proposalPrompt({
@@ -278,6 +324,7 @@ async function runProposalPasses(options: {
           projectName: options.config.project.name,
           lens,
           crew,
+          ...(options.qaInbox ? { qaInbox: options.qaInbox } : {}),
           ...(options.refinement ? { refinement: options.refinement } : {}),
         }),
         workingDirectory: options.root,
@@ -344,14 +391,35 @@ export async function generateProposal(
   options: GenerateProposalOptions,
 ): Promise<ProposalArtifactFile> {
   const goal = options.goal.trim();
-  const { items, passes } = await runProposalPasses(options);
+
+  let qaInbox: string | undefined;
+  if (options.fromQa) {
+    const bullets = qaDefectBullets(readTextIfExists(options.paths.qaFile));
+    if (!bullets) {
+      throw new Error("qa.md has no defect bullets to triage (one `- ` bullet per defect)");
+    }
+    qaInbox = bullets;
+  }
+
+  const { items, passes } = await runProposalPasses({
+    ...options,
+    lenses: lensesFor(options.lenses === true),
+    ...(qaInbox ? { qaInbox } : {}),
+  });
 
   return writeProposalArtifact(options.paths, {
     goal,
     routingTier: options.config.routing.propose,
+    ...(options.fromQa ? { source: "qa" as const } : {}),
     items,
     passes,
   });
+}
+
+/** Refinement reruns whatever passes produced the source artifact. */
+function refinementLenses(source: ProposalArtifact): readonly ProposalLens[] {
+  const lenses = [...new Set(source.passes.map((pass) => pass.lens))];
+  return lenses.length > 0 ? lenses : [BALANCED_LENS];
 }
 
 export async function refineProposal(
@@ -361,12 +429,18 @@ export async function refineProposal(
   if (!feedback) throw new Error("proposal feedback is required");
 
   const source = options.source.proposal;
+  const qaInbox =
+    source.source === "qa"
+      ? (qaDefectBullets(readTextIfExists(options.paths.qaFile)) ?? undefined)
+      : undefined;
   const { items, passes } = await runProposalPasses({
     goal: source.goal,
     root: options.root,
     paths: options.paths,
     config: options.config,
     provider: options.provider,
+    lenses: refinementLenses(source),
+    ...(qaInbox ? { qaInbox } : {}),
     onProgress: options.onProgress,
     refinement: { source, feedback },
   });
@@ -375,6 +449,7 @@ export async function refineProposal(
     id: nextRefinedProposalId(options.paths, source.id),
     goal: source.goal,
     routingTier: options.config.routing.propose,
+    ...(source.source ? { source: source.source } : {}),
     refinedFrom: source.id,
     feedback,
     items,
