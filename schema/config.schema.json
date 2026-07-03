@@ -1,0 +1,438 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "version": {
+      "default": 1,
+      "type": "number",
+      "const": 1
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseBranch": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "provider": {
+      "default": {
+        "default": "codex",
+        "codex": {
+          "tiers": {},
+          "sandbox": "workspace-write",
+          "networkAccess": false,
+          "webSearch": "cached",
+          "webSearchOverrides": {}
+        }
+      },
+      "type": "object",
+      "properties": {
+        "default": {
+          "default": "codex",
+          "type": "string",
+          "enum": ["codex", "fake"]
+        },
+        "codex": {
+          "default": {
+            "tiers": {},
+            "sandbox": "workspace-write",
+            "networkAccess": false,
+            "webSearch": "cached",
+            "webSearchOverrides": {}
+          },
+          "type": "object",
+          "properties": {
+            "tiers": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "light": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "sandbox": {
+              "default": "workspace-write",
+              "type": "string",
+              "enum": ["read-only", "workspace-write", "danger-full-access"]
+            },
+            "networkAccess": {
+              "default": false,
+              "type": "boolean"
+            },
+            "webSearch": {
+              "default": "cached",
+              "type": "string",
+              "enum": ["disabled", "cached", "live"]
+            },
+            "webSearchOverrides": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "plan": {
+                  "type": "string",
+                  "enum": ["disabled", "cached", "live"]
+                },
+                "execute": {
+                  "type": "string",
+                  "enum": ["disabled", "cached", "live"]
+                },
+                "repair": {
+                  "type": "string",
+                  "enum": ["disabled", "cached", "live"]
+                },
+                "garden": {
+                  "type": "string",
+                  "enum": ["disabled", "cached", "live"]
+                },
+                "review": {
+                  "type": "string",
+                  "enum": ["disabled", "cached", "live"]
+                },
+                "propose": {
+                  "type": "string",
+                  "enum": ["disabled", "cached", "live"]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "fake": {
+          "type": "object",
+          "properties": {
+            "script": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["script"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "routing": {
+      "default": {
+        "plan": "light",
+        "execute": "heavy",
+        "repair": "heavy",
+        "garden": "light",
+        "review": "light",
+        "propose": "light"
+      },
+      "type": "object",
+      "properties": {
+        "plan": {
+          "default": "light",
+          "type": "string",
+          "enum": ["light", "heavy"]
+        },
+        "execute": {
+          "default": "heavy",
+          "type": "string",
+          "enum": ["light", "heavy"]
+        },
+        "repair": {
+          "default": "heavy",
+          "type": "string",
+          "enum": ["light", "heavy"]
+        },
+        "garden": {
+          "default": "light",
+          "type": "string",
+          "enum": ["light", "heavy"]
+        },
+        "review": {
+          "default": "light",
+          "type": "string",
+          "enum": ["light", "heavy"]
+        },
+        "propose": {
+          "default": "light",
+          "type": "string",
+          "enum": ["light", "heavy"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "bootstrap": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "run": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timeoutMs": {
+            "default": 600000,
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["name", "run"],
+        "additionalProperties": false
+      }
+    },
+    "verify": {
+      "default": {
+        "profile": "default",
+        "profiles": {
+          "default": {
+            "steps": []
+          }
+        }
+      },
+      "type": "object",
+      "properties": {
+        "profile": {
+          "default": "default",
+          "type": "string"
+        },
+        "profiles": {
+          "default": {
+            "default": {
+              "steps": []
+            }
+          },
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "steps": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "run": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "timeoutMs": {
+                      "default": 600000,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["name", "run"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "loop": {
+      "default": {
+        "maxIterations": 20,
+        "maxFailureStreak": 3,
+        "maxNoCommitStreak": 3,
+        "maxControlOnlyStreak": 3,
+        "gardenEvery": 8,
+        "backoffMs": [5000, 30000, 120000],
+        "iterationTimeoutMs": 3600000,
+        "idleTimeoutMs": 600000,
+        "maxParallelPlans": 2
+      },
+      "type": "object",
+      "properties": {
+        "maxIterations": {
+          "default": 20,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxFailureStreak": {
+          "default": 3,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxNoCommitStreak": {
+          "default": 3,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxControlOnlyStreak": {
+          "default": 3,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "gardenEvery": {
+          "default": 8,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "backoffMs": {
+          "default": [5000, 30000, 120000],
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "iterationTimeoutMs": {
+          "default": 3600000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "idleTimeoutMs": {
+          "default": 600000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxParallelPlans": {
+          "default": 2,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "review": {
+      "default": {
+        "mode": "advisory",
+        "planReview": true,
+        "mergeReview": true,
+        "maxReviewRounds": 2
+      },
+      "type": "object",
+      "properties": {
+        "mode": {
+          "default": "advisory",
+          "type": "string",
+          "enum": ["off", "advisory", "gate"]
+        },
+        "planReview": {
+          "default": true,
+          "type": "boolean"
+        },
+        "mergeReview": {
+          "default": true,
+          "type": "boolean"
+        },
+        "maxReviewRounds": {
+          "default": 2,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "budget": {
+      "default": {
+        "quotaWindowHours": 5
+      },
+      "type": "object",
+      "properties": {
+        "quotaWindowHours": {
+          "default": 5,
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxTokensPerIteration": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "merge": {
+      "default": {
+        "policy": "auto"
+      },
+      "type": "object",
+      "properties": {
+        "policy": {
+          "default": "auto",
+          "type": "string",
+          "enum": ["auto", "branch"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "protectedPaths": {
+      "default": [".nightcrew/config.yaml", ".nightcrew/crew.md"],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "schedule": {
+      "default": {
+        "windows": [],
+        "idleCooldownMs": 300000
+      },
+      "type": "object",
+      "properties": {
+        "windows": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d-([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          }
+        },
+        "idleCooldownMs": {
+          "default": 300000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["project"],
+  "additionalProperties": false
+}

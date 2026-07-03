@@ -1,8 +1,23 @@
+import { execFileSync } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { configSchema } from "../src/config/schema";
 import { webSearchModeFor } from "../src/providers/factory";
 
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 describe("config schema", () => {
+  it("keeps the committed JSON Schema in sync with the zod schema", () => {
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        ["--experimental-strip-types", "scripts/generate-config-schema.mjs", "--check"],
+        { cwd: repoRoot, stdio: "pipe" },
+      ),
+    ).not.toThrow();
+  });
+
   it("applies defaults on a minimal config", () => {
     const config = configSchema.parse({ project: { name: "demo" } });
     expect(config.version).toBe(1);

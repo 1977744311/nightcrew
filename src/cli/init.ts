@@ -6,8 +6,13 @@ import { isGitRepo } from "../git/git";
 import { ensureDir, readTextIfExists } from "../utils/fs";
 import { log } from "../utils/log";
 
+export const CONFIG_SCHEMA_URL =
+  "https://raw.githubusercontent.com/1977744311/nightcrew/main/schema/config.schema.json";
+export const CONFIG_SCHEMA_COMMENT = `# yaml-language-server: $schema=${CONFIG_SCHEMA_URL}`;
+
 function configTemplate(name: string): string {
-  return `version: 1
+  return `${CONFIG_SCHEMA_COMMENT}
+version: 1
 
 project:
   name: ${name}
