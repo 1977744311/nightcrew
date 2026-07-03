@@ -23,12 +23,13 @@ provider:
     networkAccess: false            # may the agent itself reach the network
   # fake: { script: path/to/script.json }   # deterministic scripted runs (tests)
 
-routing:                            # operation -> model tier
+routing:                            # operation/workflow -> model tier
   plan: light
   execute: heavy
   repair: heavy
   garden: light
   review: light
+  propose: light
 
 bootstrap:                          # run once when a plan worktree is created
   - { name: install, run: npm ci, timeoutMs: 600000 }

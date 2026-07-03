@@ -61,6 +61,7 @@ export const configSchema = z.strictObject({
       repair: tierSchema.default("heavy"),
       garden: tierSchema.default("light"),
       review: tierSchema.default("light"),
+      propose: tierSchema.default("light"),
     })
     .default({
       plan: "light",
@@ -68,6 +69,7 @@ export const configSchema = z.strictObject({
       repair: "heavy",
       garden: "light",
       review: "light",
+      propose: "light",
     }),
   /** Run once when a plan worktree is created (e.g. install dependencies). */
   bootstrap: z.array(commandStepSchema).default([]),

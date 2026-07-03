@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `nightcrew propose "<goal>"`: run three read-only structured Codex-provider
+  proposal passes, persist one stable JSON artifact under `.nightcrew/proposals/`,
+  list pending proposals, and select item ids into `crew.md` BACKLOG before
+  archiving the artifact. Adds `routing.propose` (`light` by default).
+
 ## 1.1.0
 
 The dogfood release: every feature below was planned, implemented, verified,

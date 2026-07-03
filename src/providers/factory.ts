@@ -48,3 +48,7 @@ export function modelForOperation(
 export function reviewModel(config: NightcrewConfig): string | undefined {
   return modelFor(config, config.routing.review);
 }
+
+export function proposeModel(config: NightcrewConfig): string | undefined {
+  return modelFor(config, config.routing.propose);
+}

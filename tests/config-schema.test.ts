@@ -13,6 +13,7 @@ describe("config schema", () => {
       repair: "heavy",
       garden: "light",
       review: "light",
+      propose: "light",
     });
     expect(config.loop.maxFailureStreak).toBe(3);
     expect(config.loop.maxNoCommitStreak).toBe(3);

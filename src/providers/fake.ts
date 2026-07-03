@@ -24,8 +24,12 @@ export interface FakeScriptEntry {
   match?: string;
   actions?: FakeAction[];
   finalMessage?: string;
+  structuredOutput?: unknown;
   status?: "ok" | "error" | "quota";
   errorMessage?: string;
+  requireOutputSchema?: boolean;
+  expectReadOnly?: boolean;
+  expectModel?: string | null;
   /** Sleep without emitting events — trips the idle watchdog in tests. */
   silentMs?: number;
   usage?: Partial<TokenUsage>;
@@ -117,6 +121,14 @@ export class FakeProvider implements Provider {
     cursor.consumed.push(index);
     writeCursor(this.scriptFile, cursor);
     const entry = script[index] as FakeScriptEntry;
+    const expectationFailure =
+      entry.requireOutputSchema && !options.outputSchema
+        ? "fake provider expected outputSchema"
+        : entry.expectReadOnly !== undefined && entry.expectReadOnly !== (options.readOnly ?? false)
+          ? `fake provider expected readOnly=${entry.expectReadOnly}`
+          : entry.expectModel !== undefined && entry.expectModel !== (options.model ?? null)
+            ? `fake provider expected model=${entry.expectModel ?? "unset"}`
+            : null;
 
     const controller = new AbortController();
     const watchdog = new Watchdog(options.timeoutMs, options.idleTimeoutMs, () =>
@@ -156,6 +168,27 @@ export class FakeProvider implements Provider {
         };
       }
 
+      const usage: TokenUsage = {
+        inputTokens: entry.usage?.inputTokens ?? 1_000,
+        cachedInputTokens: entry.usage?.cachedInputTokens ?? 0,
+        outputTokens: entry.usage?.outputTokens ?? 200,
+        reasoningOutputTokens: entry.usage?.reasoningOutputTokens ?? 0,
+      };
+      const finalMessage =
+        entry.structuredOutput === undefined
+          ? (entry.finalMessage ?? "DONE")
+          : JSON.stringify(entry.structuredOutput);
+
+      if (expectationFailure) {
+        return {
+          status: "error",
+          finalMessage,
+          sessionId,
+          usage,
+          errorMessage: expectationFailure,
+        };
+      }
+
       for (const action of entry.actions ?? []) {
         await applyAction(action, options.workingDirectory);
         options.onEvent?.({
@@ -165,17 +198,10 @@ export class FakeProvider implements Provider {
         watchdog.touch();
       }
 
-      const usage: TokenUsage = {
-        inputTokens: entry.usage?.inputTokens ?? 1_000,
-        cachedInputTokens: entry.usage?.cachedInputTokens ?? 0,
-        outputTokens: entry.usage?.outputTokens ?? 200,
-        reasoningOutputTokens: entry.usage?.reasoningOutputTokens ?? 0,
-      };
-
       if (entry.status === "error") {
         return {
           status: "error",
-          finalMessage: entry.finalMessage ?? "",
+          finalMessage,
           sessionId,
           usage,
           errorMessage: entry.errorMessage ?? "fake provider error",
@@ -184,13 +210,13 @@ export class FakeProvider implements Provider {
       if (entry.status === "quota") {
         return {
           status: "quota",
-          finalMessage: entry.finalMessage ?? "",
+          finalMessage,
           sessionId,
           usage,
           errorMessage: entry.errorMessage ?? "usage limit reached",
         };
       }
-      return { status: "ok", finalMessage: entry.finalMessage ?? "DONE", sessionId, usage };
+      return { status: "ok", finalMessage, sessionId, usage };
     } finally {
       watchdog.stop();
     }
