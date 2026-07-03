@@ -3,6 +3,7 @@ import type { ProjectContext } from "../config/load";
 import type { FailureKind, IterationRecord, TokenUsage } from "../core/types";
 import { addUsage, totalTokens } from "../core/types";
 import { listPlans } from "../plans/plans";
+import { aggregatePlanHistory } from "../plans/accounting";
 import { readHistory } from "../state/history";
 import { readState } from "../state/state";
 import { readTextIfExists } from "../utils/fs";
@@ -54,40 +55,6 @@ function openQuestions(text: string | null): string[] {
     .filter(Boolean);
 }
 
-function completedPlanTitle(ctx: ProjectContext, planId: string): string {
-  for (const status of ["completed", "active", "paused"] as const) {
-    const match = listPlans(ctx.paths, status).find((plan) => plan.id === planId);
-    if (match) return match.title;
-  }
-  return planId;
-}
-
-function planBreakdown(ctx: ProjectContext, history: IterationRecord[]): ReportPlanBreakdown[] {
-  const plans = new Map<string, Omit<ReportPlanBreakdown, "totalTokens">>();
-
-  for (const record of history) {
-    if (!record.planId) continue;
-    const existing =
-      plans.get(record.planId) ??
-      ({
-        planId: record.planId,
-        title: completedPlanTitle(ctx, record.planId),
-        iterations: 0,
-        usage: null,
-        landed: false,
-      } satisfies Omit<ReportPlanBreakdown, "totalTokens">);
-    existing.iterations += 1;
-    existing.usage = addUsage(existing.usage, record.usage);
-    existing.landed = existing.landed || record.merged;
-    plans.set(record.planId, existing);
-  }
-
-  return [...plans.values()].map((plan) => ({
-    ...plan,
-    totalTokens: totalTokens(plan.usage),
-  }));
-}
-
 /** Everything the morning digest needs, as data (the CLI renders it, tests assert it). */
 export function buildReport(ctx: ProjectContext, sinceMs: number): ReportData {
   const now = Date.now();
@@ -96,6 +63,8 @@ export function buildReport(ctx: ProjectContext, sinceMs: number): ReportData {
     (record) => Date.parse(record.startedAt) >= since.getTime(),
   );
   const state = readState(ctx.paths);
+  const planMetrics = aggregatePlanHistory(ctx, history);
+  const planTitles = new Map(planMetrics.map((plan) => [plan.planId, plan.title]));
 
   const iterations = {
     total: history.length,
@@ -109,7 +78,7 @@ export function buildReport(ctx: ProjectContext, sinceMs: number): ReportData {
     .filter((record) => record.merged && record.planId)
     .map((record) => ({
       planId: record.planId as string,
-      title: completedPlanTitle(ctx, record.planId as string),
+      title: planTitles.get(record.planId as string) ?? (record.planId as string),
       commits: record.commits.length,
     }));
 
@@ -138,7 +107,14 @@ export function buildReport(ctx: ProjectContext, sinceMs: number): ReportData {
     since: since.toISOString(),
     until: new Date(now).toISOString(),
     iterations,
-    plans: planBreakdown(ctx, history),
+    plans: planMetrics.map(({ planId, title, iterations, usage, totalTokens, landed }) => ({
+      planId,
+      title,
+      iterations,
+      usage,
+      totalTokens,
+      landed,
+    })),
     landed,
     commits: history.reduce((sum, record) => sum + record.commits.length, 0),
     usage,
