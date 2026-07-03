@@ -12,6 +12,9 @@
     "url": "git+https://github.com/1977744311/nightcrew.git"
   },
   "homepage": "https://github.com/1977744311/nightcrew#readme",
+  "publishConfig": {
+    "provenance": true
+  },
   "keywords": [
     "ai",
     "agents",

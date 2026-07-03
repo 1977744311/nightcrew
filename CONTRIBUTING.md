@@ -52,4 +52,33 @@ Node >= 22, npm (the repo has `package-lock.json`), git. No other services.
 
 Semver from 1.0.0: the config schema, CLI surface, `operation` model, and
 library exports are frozen — breaking any of them is a major. Releases are
-tagged from `main` with an updated `CHANGELOG.md`.
+published from `main` with an updated `CHANGELOG.md`.
+
+Release automation is intentionally operator-owned:
+
+- The repository needs an Actions secret named `NPM_TOKEN`. Create it from an
+  npm automation token with publish rights for the `nightcrew` package. Do not
+  commit tokens or place them in local config.
+- Normal flow: merge releasable changes with a changeset. The Release workflow
+  runs `npm run check`, then `changesets/action` opens or updates the version
+  PR. The operator reviews that PR and merges it when ready to release.
+- When the version PR lands on `main`, the same workflow publishes with
+  `npm publish --provenance`. The workflow grants `id-token: write`, and
+  `package.json` sets `publishConfig.provenance` so npm records provenance for
+  the package.
+
+Manual fallback if the workflow or npm token is unavailable:
+
+```bash
+git switch main
+git pull --ff-only
+npm ci
+npm run check
+npm version <patch|minor|major>
+git push origin main --follow-tags
+npm publish
+```
+
+Use the fallback only from a clean `main` checkout after confirming the
+`CHANGELOG.md` entry and intended semver level. The `npm version` command owns
+the release commit and git tag in this path.

@@ -9,9 +9,9 @@ parallel: false
 Close the release-operations seam by adding the authorized changesets version-PR and npm provenance publish path, while preserving the operator-owned release mechanics: no version bumps, no tag changes, no existing CI rewrites, and clear documentation for the required `NPM_TOKEN` secret plus the manual fallback flow.
 
 ## Acceptance
-- [ ] `.github/workflows/release.yml` uses the official changesets action for version PRs and publishes with `npm publish --provenance` using the `NPM_TOKEN` secret, without changing existing CI workflows, version numbers, or git tags.
-- [ ] `package.json` includes `publishConfig.provenance`, and `CONTRIBUTING.md` documents the secret setup, automated release steps, and the existing manual `npm version` plus tag fallback.
-- [ ] Focused validation covers the workflow/package/docs contract where practical, and the standard format/type/test checks pass.
+- [x] `.github/workflows/release.yml` uses the official changesets action for version PRs and publishes with `npm publish --provenance` using the `NPM_TOKEN` secret, without changing existing CI workflows, version numbers, or git tags.
+- [x] `package.json` includes `publishConfig.provenance`, and `CONTRIBUTING.md` documents the secret setup, automated release steps, and the existing manual `npm version` plus tag fallback.
+- [x] Focused validation covers the workflow/package/docs contract where practical, and the standard format/type/test checks pass.
 
 ## Steps
 1. Inspect the existing workflows, release documentation, package publishing metadata, and any changesets setup to avoid altering unrelated release mechanics.
