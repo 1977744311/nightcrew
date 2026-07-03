@@ -259,7 +259,7 @@ export function buildProgram(): Command {
         } else if (goal) {
           await runPropose(ctx, goal, { lenses: options.lenses ?? false });
         } else if (options.ids) {
-          selectProposal(ctx, options.ids, options.proposal);
+          await selectProposal(ctx, options.ids, options.proposal);
         } else if (options.feedback) {
           await refineStoredProposal(ctx, { file: options.proposal, feedback: options.feedback });
         } else {

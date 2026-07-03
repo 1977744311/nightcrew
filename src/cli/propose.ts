@@ -1,6 +1,7 @@
 import { relative } from "node:path";
 import pc from "picocolors";
 import type { ProjectContext } from "../config/load";
+import { notifyWebhook } from "../notify/webhook";
 import {
   generateProposal,
   type ProposalProgressReporter,
@@ -106,10 +107,19 @@ function printProposalList(ctx: ProjectContext): void {
   }
 }
 
-export function selectProposal(ctx: ProjectContext, idsValue: string, proposal?: string): void {
+export async function selectProposal(
+  ctx: ProjectContext,
+  idsValue: string,
+  proposal?: string,
+): Promise<void> {
   const ids = parseProposalIds(idsValue);
   const result = selectProposalItems(ctx.paths, { ids, proposalIdOrFile: proposal });
   printProposalSelectionResult(ctx, result);
+  await notifyWebhook(ctx, {
+    event: "proposal_landed",
+    proposalId: result.proposal.id,
+    selectedItems: result.selectedItems.length,
+  });
 }
 
 export async function reviewProposal(

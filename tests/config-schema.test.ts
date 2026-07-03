@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { configSchema } from "../src/config/schema";
+import { configSchema, NOTIFY_EVENTS } from "../src/config/schema";
 import { webSearchModeFor } from "../src/providers/factory";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -40,6 +40,7 @@ describe("config schema", () => {
     expect(config.review.mode).toBe("advisory");
     expect(config.review.maxReviewRounds).toBe(2);
     expect(config.merge.policy).toBe("auto");
+    expect(config.notify).toEqual({ events: [...NOTIFY_EVENTS] });
     expect(config.protectedPaths).toContain(".nightcrew/config.yaml");
     expect(config.verify.profile).toBe("default");
   });
@@ -80,6 +81,34 @@ describe("config schema", () => {
       configSchema.parse({
         project: { name: "demo" },
         provider: { codex: { webSearchOverrides: { proposee: "live" } } },
+      }),
+    ).toThrow();
+  });
+
+  it("parses notify webhook URLs and optional event filters", () => {
+    const config = configSchema.parse({
+      project: { name: "demo" },
+      notify: {
+        webhook: "https://hooks.example.test/nightcrew",
+        events: ["loop_stopped", "proposal_landed"],
+      },
+    });
+
+    expect(config.notify.webhook).toBe("https://hooks.example.test/nightcrew");
+    expect(config.notify.events).toEqual(["loop_stopped", "proposal_landed"]);
+  });
+
+  it("rejects malformed notify webhooks and event names", () => {
+    expect(() =>
+      configSchema.parse({
+        project: { name: "demo" },
+        notify: { webhook: "not a url" },
+      }),
+    ).toThrow();
+    expect(() =>
+      configSchema.parse({
+        project: { name: "demo" },
+        notify: { events: ["loop_stoped"] },
       }),
     ).toThrow();
   });

@@ -61,6 +61,10 @@ verify:
 # merge:
 #   policy: auto            # auto: land green plans onto base | branch: leave for manual merge
 
+# notify:
+#   webhook: https://example.com/nightcrew
+#   events: [loop_stopped, open_question, proposal_landed]
+
 # schedule:
 #   windows: ["23:00-07:00"]  # crew daemon runs only inside these local-time windows
 `;

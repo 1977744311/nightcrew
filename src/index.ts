@@ -20,6 +20,8 @@ export {
   configSchema,
   type NightcrewConfig,
   type NightcrewConfigInput,
+  NOTIFY_EVENTS,
+  type NotifyEvent,
   type VerifyProfile,
 } from "./config/schema";
 export { type ConsoleOptions, createConsoleServer } from "./console/server";
@@ -29,6 +31,16 @@ export * from "./core/types";
 export { type LoopOptions, type LoopResult, runLoop } from "./loop/loop";
 export { type RunnerDeps, type RunOptions, runIteration } from "./loop/runner";
 export { maybeTriageQa, type QaTriageOutcome } from "./loop/triage";
+export {
+  buildNotifyPayload,
+  type NotifyCounts,
+  type NotifyInput,
+  type NotifyOptions,
+  type NotifyPayload,
+  type NotifyPost,
+  notificationCounts,
+  notifyWebhook,
+} from "./notify/webhook";
 export {
   aggregatePlanHistory,
   type PlanHistoryMetric,

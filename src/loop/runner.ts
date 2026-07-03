@@ -26,6 +26,7 @@ import {
 import { mergeBranch } from "../git/merge";
 import { enforceWriteScope, snapshotDirtyPaths } from "../git/scope";
 import { ensureWorktree, planBranch, removeWorktree } from "../git/worktree";
+import { notifyWebhook } from "../notify/webhook";
 import { findPlan, listPlans, movePlan, readPlan, validatePlan } from "../plans/plans";
 import { overTokenCap, quotaResumeAt } from "../policy/budget";
 import { applyIteration } from "../policy/guards";
@@ -81,6 +82,7 @@ async function appendQuestion(ctx: ProjectContext, text: string): Promise<void> 
   appendLine(ctx.paths.questionsFile, stampText);
   const rel = relative(ctx.root, ctx.paths.questionsFile);
   await commitPaths(ctx.root, [rel], "nightcrew: record open question");
+  await notifyWebhook(ctx, { event: "open_question", question: text });
 }
 
 /** Serializes every main-checkout mutation (control commits, merges) per repo. */
@@ -255,6 +257,9 @@ export async function runIteration(
     merged: record.merged,
     stop: stop?.reason,
   });
+  if (stop) {
+    await notifyWebhook(ctx, { event: "loop_stopped", reason: stop.reason, detail: stop.detail });
+  }
 
   return record;
 }

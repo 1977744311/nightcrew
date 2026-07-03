@@ -9,11 +9,11 @@ parallel: false
 Close the operator notification seam by adding an additive `notify` config surface and deterministic webhook delivery for loop stop reasons, newly appended open questions, and landed pending proposals, so unattended runs can alert the operator without relying on model behavior or blocking the loop when delivery fails.
 
 ## Acceptance
-- [ ] `notify.webhook` and optional event filtering parse through config and generated schema without changing existing config keys or defaults.
-- [ ] Loop typed stops, new open-question appends, and pending proposal landings enqueue one compact JSON POST with project name, landed/failed/open-question/pending-proposal counts, and console address hint.
-- [ ] Webhook delivery is deterministic runtime code only, never calls a provider/model, and failed POSTs emit a warning without changing loop/proposal success or failure outcomes.
-- [ ] Tests cover config parsing/defaults, event filtering, all required trigger points, payload shape, and warning-only behavior on push failure.
-- [ ] `CHANGELOG.md` is updated under `## Unreleased`.
+- [x] `notify.webhook` and optional event filtering parse through config and generated schema without changing existing config keys or defaults.
+- [x] Loop typed stops, new open-question appends, and pending proposal landings enqueue one compact JSON POST with project name, landed/failed/open-question/pending-proposal counts, and console address hint.
+- [x] Webhook delivery is deterministic runtime code only, never calls a provider/model, and failed POSTs emit a warning without changing loop/proposal success or failure outcomes.
+- [x] Tests cover config parsing/defaults, event filtering, all required trigger points, payload shape, and warning-only behavior on push failure.
+- [x] `CHANGELOG.md` is updated under `## Unreleased`.
 
 ## Steps
 1. Inspect the config schema, generated schema workflow, loop stop handling, question append path, proposal landing path, report/count helpers, and runtime logging style.

@@ -1,5 +1,6 @@
 import type { ProjectContext } from "../config/load";
 import type { IterationRecord, StopReason } from "../core/types";
+import { notifyWebhook } from "../notify/webhook";
 import { emitEvent } from "../state/events";
 import { readState, updateState } from "../state/state";
 import { isoNow } from "../utils/id";
@@ -53,11 +54,10 @@ export async function runLoop(
 
   while (true) {
     if (options.signal?.aborted) {
-      emitEvent(paths, config.project.name, "loop.stopped", {
-        reason: "operator",
-        detail: "aborted",
-      });
-      return { iterations, stop: { reason: "operator", detail: "aborted" } };
+      const stop = { reason: "operator" as const, detail: "aborted" };
+      emitEvent(paths, config.project.name, "loop.stopped", stop);
+      await notifyWebhook(ctx, { event: "loop_stopped", ...stop });
+      return { iterations, stop };
     }
 
     const state = readState(paths);
@@ -86,6 +86,7 @@ export async function runLoop(
         s.stop = { reason: stop.reason, at: isoNow(), detail: stop.detail };
       });
       emitEvent(paths, config.project.name, "loop.stopped", stop);
+      await notifyWebhook(ctx, { event: "loop_stopped", ...stop });
       return { iterations, stop };
     }
 

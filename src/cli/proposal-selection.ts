@@ -3,6 +3,7 @@ import { isCancel, MultiSelectPrompt, settings } from "@clack/core";
 import { text } from "@clack/prompts";
 import pc from "picocolors";
 import type { ProjectContext } from "../config/load";
+import { notifyWebhook } from "../notify/webhook";
 import {
   type ProposalArtifact,
   type ProposalArtifactFile,
@@ -222,6 +223,11 @@ export async function reviewProposalSelection(
     proposalIdOrFile: artifact.file,
   });
   printProposalSelectionResult(ctx, result);
+  await notifyWebhook(ctx, {
+    event: "proposal_landed",
+    proposalId: result.proposal.id,
+    selectedItems: result.selectedItems.length,
+  });
   return {
     mode: "interactive",
     selectedItems: result.selectedItems,
