@@ -180,31 +180,31 @@ an empty backlog means the crew idles instead of inventing work.
       Include `README.zh-CN.md` in package publishing metadata so the localized README ships with npm package contents.
       Update `CHANGELOG.md` under `## Unreleased`. Tests included.
 
-- [ ] 操作者通知：新增 `notify` 配置段（v1 只做一个 `webhook` URL 加可选
+- [x] 操作者通知：新增 `notify` 配置段（v1 只做一个 `webhook` URL 加可选
       事件过滤，schema 只增不改）。当 loop 以 typed reason 停止、有新 open
       question 追加、或有 pending proposal 落地（含 qa triage）时 POST 一段
       紧凑 JSON：项目名、计数（landed / failed / open questions / pending
       proposals）和 console 地址提示。纯确定性代码，不调用模型；推送失败
       只记 warning，绝不拖垮 loop。代码、注释与 CLI 输出保持英文。
       Tests included.
-- [ ] Codex 预检：`nightcrew doctor` 增加 provider 检查——配置为 codex 时
+- [x] Codex 预检：`nightcrew doctor` 增加 provider 检查——配置为 codex 时
       验证登录凭据存在（可读的 `~/.codex/auth.json` 或等价的轻量 SDK 探
       测），失败时给出 `codex login` 提示；fake provider 报 skip。同样的检
       查在 `nightcrew loop` 与 `crew start` 启动时 fail-fast，避免没装或没
       订阅时白烧一次迭代。代码与 CLI 输出保持英文。Tests included.
-- [ ] BACKLOG 完成项自动勾选：plan 操作在 frontmatter 里用可选 `backlog`
+- [x] BACKLOG 完成项自动勾选：plan 操作在 frontmatter 里用可选 `backlog`
       字段记录该计划覆盖的 BACKLOG 条目（精确首行文本；plan review 校验
       映射）。merge 成功后由确定性 runner 代码——绝不是 agent——把 crew.md
       里对应的 `- [ ]` 勾成 `- [x]`；找不到唯一匹配就记一条 note 且不做任
       何改动。agent 对 crew.md 的写入限制保持与今天完全一致。
       Tests included.
-- [ ] `pr` 合并模式：新增 `git.mergeMode: merge | pr` 配置（默认 merge，
+- [x] `pr` 合并模式：新增 `git.mergeMode: merge | pr` 配置（默认 merge，
       只增不改）。pr 模式下，门禁全绿的已完成 plan 推送 `nightcrew/<plan-id>`
       分支并用 `gh` CLI 向 base branch 开 PR（正文为 plan 标题加验收摘
       要），把 PR URL 记入 history notes，随后完成该 plan 并清理 worktree；
       push 或开 PR 失败转为 typed repair。`nightcrew doctor` 仅在配置了 pr
       模式时要求 `gh` 存在。Tests included.
-- [ ] `nightcrew init --assist`：脚手架完成后跑一次只读 Codex pass，检查仓
+- [x] `nightcrew init --assist`：脚手架完成后跑一次只读 Codex pass，检查仓
       库并起草配置——verify profile 步骤、bootstrap 命令、baseBranch——外加
       2-3 条初始 crew.md rules。先打印草稿，操作者明确确认后才写入
       （非 TTY：只打印不写）。裸 `init` 保持离线且行为不变；fake provider
