@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { listPlans } from "../src/plans/plans";
@@ -6,13 +6,51 @@ import { readState } from "../src/state/state";
 import { gitSync, makeTempProject, planFileContents, type TestProject } from "./helpers";
 
 let project: TestProject;
+const ORIGINAL_PATH = process.env.PATH;
+const ORIGINAL_FAKE_GH_FAIL = process.env.NIGHTCREW_FAKE_GH_FAIL;
 
 afterEach(() => {
+  process.env.PATH = ORIGINAL_PATH;
+  if (ORIGINAL_FAKE_GH_FAIL === undefined) {
+    delete process.env.NIGHTCREW_FAKE_GH_FAIL;
+  } else {
+    process.env.NIGHTCREW_FAKE_GH_FAIL = ORIGINAL_FAKE_GH_FAIL;
+  }
   project?.cleanup();
 });
 
 const PLAN_ID = "2026-07-02-hello-feature";
 const PLAN_PATH = `.nightcrew/plans/active/${PLAN_ID}.md`;
+
+function addBareOrigin(): void {
+  const remote = join(project.home, "origin.git");
+  gitSync(project.root, "init", "--bare", remote);
+  gitSync(project.root, "remote", "add", "origin", remote);
+}
+
+function installFakeGh(): string {
+  const bin = join(project.home, "bin");
+  const log = join(project.home, "gh-log.jsonl");
+  mkdirSync(bin, { recursive: true });
+  const script = join(bin, "gh");
+  writeFileSync(
+    script,
+    [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      `fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + "\\n");`,
+      "if (process.env.NIGHTCREW_FAKE_GH_FAIL === '1') {",
+      "  console.error('failed to create pull request');",
+      "  process.exit(1);",
+      "}",
+      "console.log('https://github.com/example/repo/pull/123');",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(script, 0o755);
+  process.env.PATH = `${bin}:${ORIGINAL_PATH ?? ""}`;
+  return log;
+}
 
 describe("single-project vertical slice", () => {
   it("runs plan → execute (worktree) → merge back, full green path", async () => {
@@ -66,6 +104,155 @@ describe("single-project vertical slice", () => {
     expect(branches.trim()).toBe("");
     // Session cleared after completion.
     expect(readState(project.ctx().paths).sessions[PLAN_ID]).toBeUndefined();
+  });
+
+  it("pushes a completed plan branch and opens a pull request in PR merge mode", async () => {
+    project = await makeTempProject({ git: { mergeMode: "pr" } });
+    addBareOrigin();
+    const ghLog = installFakeGh();
+    project.setCrew(["Ship the hello feature"]);
+    project.setScript([
+      {
+        match: "operation = \\*\\*plan\\*\\*",
+        actions: [
+          { type: "write", path: PLAN_PATH, content: planFileContents(PLAN_ID, "Hello feature") },
+        ],
+        finalMessage: "authored plan",
+      },
+      {
+        match: "operation = \\*\\*execute\\*\\*",
+        actions: [
+          { type: "write", path: "src/hello.txt", content: "hello from the crew\n" },
+          {
+            type: "write",
+            path: PLAN_PATH,
+            content: planFileContents(PLAN_ID, "Hello feature").replace("- [ ]", "- [x]"),
+          },
+        ],
+        finalMessage: "done. PLAN COMPLETE",
+      },
+    ]);
+
+    await project.run();
+    const execRecord = await project.run();
+
+    expect(execRecord.status).toBe("success");
+    expect(execRecord.merged).toBe(true);
+    expect(execRecord.notes).toContain(
+      "opened pull request: https://github.com/example/repo/pull/123",
+    );
+    expect(execRecord.notes).toContain(`pushed nightcrew/${PLAN_ID} for review against main`);
+    expect(existsSync(join(project.root, "src/hello.txt"))).toBe(false);
+    expect(listPlans(project.ctx().paths, "active")).toHaveLength(0);
+    expect(listPlans(project.ctx().paths, "completed").map((p) => p.id)).toContain(PLAN_ID);
+    expect(existsSync(join(project.root, ".nightcrew/worktrees", PLAN_ID))).toBe(false);
+    expect(gitSync(project.root, "branch", "--list", `nightcrew/${PLAN_ID}`).trim()).toBe("");
+    expect(
+      gitSync(project.root, "ls-remote", "--heads", "origin", `nightcrew/${PLAN_ID}`),
+    ).toContain(`refs/heads/nightcrew/${PLAN_ID}`);
+    expect(readState(project.ctx().paths).sessions[PLAN_ID]).toBeUndefined();
+
+    const ghArgs = JSON.parse(readFileSync(ghLog, "utf8").trim()) as string[];
+    expect(ghArgs).toEqual(
+      expect.arrayContaining([
+        "pr",
+        "create",
+        "--base",
+        "main",
+        "--head",
+        `nightcrew/${PLAN_ID}`,
+        "--title",
+        "nightcrew: Hello feature",
+      ]),
+    );
+    const body = ghArgs[ghArgs.indexOf("--body") + 1];
+    expect(body).toContain("## Acceptance");
+    expect(body).toContain("- [x] feature file exists");
+  });
+
+  it("keeps a completed plan active as a typed repair when PR-mode push fails", async () => {
+    project = await makeTempProject({ git: { mergeMode: "pr" } });
+    project.setCrew(["Ship the hello feature"]);
+    project.setScript([
+      {
+        match: "operation = \\*\\*plan\\*\\*",
+        actions: [
+          { type: "write", path: PLAN_PATH, content: planFileContents(PLAN_ID, "Hello feature") },
+        ],
+      },
+      {
+        match: "operation = \\*\\*execute\\*\\*",
+        actions: [
+          { type: "write", path: "src/hello.txt", content: "hello from the crew\n" },
+          {
+            type: "write",
+            path: PLAN_PATH,
+            content: planFileContents(PLAN_ID, "Hello feature").replace("- [ ]", "- [x]"),
+          },
+        ],
+        finalMessage: "PLAN COMPLETE",
+      },
+    ]);
+
+    await project.run();
+    const failed = await project.run();
+
+    expect(failed.status).toBe("failed");
+    expect(failed.failure?.kind).toBe("git_push_failed");
+    expect(failed.merged).toBe(false);
+    expect(Object.values(readState(project.ctx().paths).pendingRepairs)[0]).toMatchObject({
+      planId: PLAN_ID,
+      reason: "git_push_failed",
+    });
+    expect(listPlans(project.ctx().paths, "active").map((p) => p.id)).toContain(PLAN_ID);
+    expect(listPlans(project.ctx().paths, "completed")).toHaveLength(0);
+    expect(existsSync(join(project.root, ".nightcrew/worktrees", PLAN_ID))).toBe(true);
+    expect(gitSync(project.root, "branch", "--list", `nightcrew/${PLAN_ID}`)).toContain(
+      `nightcrew/${PLAN_ID}`,
+    );
+  });
+
+  it("keeps a completed plan active as a typed repair when PR creation fails", async () => {
+    project = await makeTempProject({ git: { mergeMode: "pr" } });
+    addBareOrigin();
+    installFakeGh();
+    process.env.NIGHTCREW_FAKE_GH_FAIL = "1";
+    project.setCrew(["Ship the hello feature"]);
+    project.setScript([
+      {
+        match: "operation = \\*\\*plan\\*\\*",
+        actions: [
+          { type: "write", path: PLAN_PATH, content: planFileContents(PLAN_ID, "Hello feature") },
+        ],
+      },
+      {
+        match: "operation = \\*\\*execute\\*\\*",
+        actions: [
+          { type: "write", path: "src/hello.txt", content: "hello from the crew\n" },
+          {
+            type: "write",
+            path: PLAN_PATH,
+            content: planFileContents(PLAN_ID, "Hello feature").replace("- [ ]", "- [x]"),
+          },
+        ],
+        finalMessage: "PLAN COMPLETE",
+      },
+    ]);
+
+    await project.run();
+    const failed = await project.run();
+
+    expect(failed.status).toBe("failed");
+    expect(failed.failure?.kind).toBe("pull_request_failed");
+    expect(Object.values(readState(project.ctx().paths).pendingRepairs)[0]).toMatchObject({
+      planId: PLAN_ID,
+      reason: "pull_request_failed",
+    });
+    expect(listPlans(project.ctx().paths, "active").map((p) => p.id)).toContain(PLAN_ID);
+    expect(existsSync(join(project.root, ".nightcrew/worktrees", PLAN_ID))).toBe(true);
+    expect(
+      gitSync(project.root, "ls-remote", "--heads", "origin", `nightcrew/${PLAN_ID}`),
+    ).toContain(`refs/heads/nightcrew/${PLAN_ID}`);
   });
 
   it("keeps the session across iterations of the same plan", async () => {

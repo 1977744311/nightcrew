@@ -88,9 +88,12 @@ plan complete? → verify green? → merge review approves? → main checkout cl
                                      escalate to human       preserved for you
 ```
 
-Merge policy `auto` merges `--no-ff` into the base branch; `branch` stops
-after review and leaves the branch for a human PR. Either way the plan file
-moves to `completed/` and the worktree is removed.
+Merge policy `auto` merges `--no-ff` into the base branch. With
+`git.mergeMode: pr`, the same green landing pushes `nightcrew/<id>` and opens a
+GitHub PR against the base branch instead of merging locally. The legacy
+`merge.policy: branch` setting stops after review and leaves the branch for a
+human. Either completed landing moves the plan file to `completed/` and removes
+the worktree.
 
 ## Review agent
 

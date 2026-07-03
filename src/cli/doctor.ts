@@ -7,6 +7,7 @@ import { type Registry, readRegistry } from "../config/registry";
 import { configSchema, type NightcrewConfig } from "../config/schema";
 import { type ProjectPaths, projectPaths } from "../core/paths";
 import { type GitResult, git } from "../git/git";
+import { gh } from "../git/pull-request";
 import {
   type ProviderPreflightOptions,
   type ProviderPreflightStatus,
@@ -31,6 +32,7 @@ export interface DoctorReport {
 export interface DoctorCheckOptions {
   nodeVersion?: string;
   git?: (args: string[], cwd: string) => Promise<GitResult>;
+  gh?: (args: string[], cwd: string) => Promise<GitResult>;
   registry?: Registry | (() => Registry);
   isProcessAlive?: (pid: number) => boolean;
   providerPreflight?: ProviderPreflightOptions;
@@ -196,6 +198,18 @@ async function baseBranchCheck(
     : fail("base branch", `${branch} does not exist locally`);
 }
 
+async function ghExecutableCheck(
+  root: string,
+  config: NightcrewConfig | null,
+  runGh: (args: string[], cwd: string) => Promise<GitResult>,
+): Promise<DoctorCheckResult | null> {
+  if (config?.git.mergeMode !== "pr") return null;
+  const version = await runGh(["--version"], root);
+  return version.ok
+    ? pass("gh executable", oneLine(version.stdout))
+    : fail("gh executable", gitDetail(version));
+}
+
 function registryCheck(root: string, options: DoctorCheckOptions): DoctorCheckResult {
   let registry: Registry;
   try {
@@ -266,6 +280,7 @@ export async function runDoctorChecks(
   const normalizedRoot = resolve(root);
   const paths = projectPaths(normalizedRoot);
   const runGit = options.git ?? git;
+  const runGh = options.gh ?? gh;
   const checks: DoctorCheckResult[] = [];
 
   const version = options.nodeVersion ?? process.versions.node;
@@ -318,6 +333,8 @@ export async function runDoctorChecks(
   checks.push(...bootstrapCommandChecks(configInput));
   checks.push(...verifyCommandChecks(configInput, config));
   checks.push(providerAuthCheck(config, options));
+  const ghCheck = await ghExecutableCheck(normalizedRoot, config, runGh);
+  if (ghCheck) checks.push(ghCheck);
   checks.push(await baseBranchCheck(normalizedRoot, config, repoOk, runGit));
   checks.push(registryCheck(normalizedRoot, options));
   checks.push(daemonLockCheck(paths, options));

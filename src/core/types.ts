@@ -18,6 +18,8 @@ export const FAILURE_KINDS = [
   "verify_failed",
   "write_scope_violation",
   "merge_conflict",
+  "git_push_failed",
+  "pull_request_failed",
   "quota_exhausted",
   "review_rejected",
   "plan_invalid",

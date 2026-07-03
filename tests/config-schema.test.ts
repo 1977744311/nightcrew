@@ -39,6 +39,7 @@ describe("config schema", () => {
     expect(config.loop.gardenEvery).toBe(8);
     expect(config.review.mode).toBe("advisory");
     expect(config.review.maxReviewRounds).toBe(2);
+    expect(config.git.mergeMode).toBe("merge");
     expect(config.merge.policy).toBe("auto");
     expect(config.notify).toEqual({ events: [...NOTIFY_EVENTS] });
     expect(config.protectedPaths).toContain(".nightcrew/config.yaml");
@@ -68,6 +69,21 @@ describe("config schema", () => {
     expect(webSearchModeFor(config, "propose")).toBe("live");
     expect(webSearchModeFor(config, "execute")).toBe("disabled");
     expect(webSearchModeFor(config, "review")).toBe("cached");
+  });
+
+  it("parses git merge modes", () => {
+    const config = configSchema.parse({
+      project: { name: "demo" },
+      git: { mergeMode: "pr" },
+    });
+
+    expect(config.git.mergeMode).toBe("pr");
+    expect(() =>
+      configSchema.parse({
+        project: { name: "demo" },
+        git: { mergeMode: "pull-request" },
+      }),
+    ).toThrow();
   });
 
   it("rejects invalid Codex web-search modes and override keys", () => {

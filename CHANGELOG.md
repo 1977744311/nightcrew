@@ -11,6 +11,10 @@
 - Added `notify.webhook` with optional event filtering for deterministic JSON
   webhook notifications when loops stop, open questions are appended, or pending
   proposals land.
+- Added `git.mergeMode: pr` to publish green completed plans as GitHub pull
+  requests through `git push` and `gh pr create`, with typed repair handling for
+  push or PR creation failures and conditional `nightcrew doctor` checks for
+  the GitHub CLI.
 
 ## 1.4.0
 
