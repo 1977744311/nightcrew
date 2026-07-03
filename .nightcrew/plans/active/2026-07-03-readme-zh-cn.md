@@ -9,9 +9,9 @@ parallel: false
 Add the authorized localized README surface and package guardrails so Chinese readers get a maintained README without allowing Han-script text to leak into source, docs, tests, package metadata, changelog text, or CLI output.
 
 ## Acceptance
-- [ ] `README.zh-CN.md` mirrors the current `README.md` structure, commands, config keys, links, status, and license details, with reciprocal language links between both README files.
-- [ ] Package publishing metadata includes `README.zh-CN.md`, `CHANGELOG.md` has an `## Unreleased` entry, and focused tests verify Han-script placement plus package inclusion.
-- [ ] Relevant tests and formatting/type checks pass under the repo's existing TypeScript, Biome, and vitest workflow.
+- [x] `README.zh-CN.md` mirrors the current `README.md` structure, commands, config keys, links, status, and license details, with reciprocal language links between both README files.
+- [x] Package publishing metadata includes `README.zh-CN.md`, `CHANGELOG.md` has an `## Unreleased` entry, and focused tests verify Han-script placement plus package inclusion.
+- [x] Relevant tests and formatting/type checks pass under the repo's existing TypeScript, Biome, and vitest workflow.
 
 ## Steps
 1. Review `README.md`, package publishing metadata, changelog conventions, and nearby tests for text-file/package assertions.
