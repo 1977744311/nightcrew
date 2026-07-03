@@ -197,6 +197,16 @@ function proposalPrompt(input: {
   }
 
   lines.push(
+    "## Language",
+    "",
+    input.refinement
+      ? "- Write every candidate `title`, `body`, and `rationale` in the same language as the operator feedback."
+      : "- Write every candidate `title`, `body`, and `rationale` in the same language as the operator goal text.",
+    "- Preserve the BACKLOG checkbox formatting rules below regardless of language.",
+    "",
+  );
+
+  lines.push(
     "## Source Lens",
     "",
     `${LENS_LABELS[input.lens]}: ${LENS_INSTRUCTIONS[input.lens]}`,
