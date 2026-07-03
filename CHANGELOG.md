@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added `nightcrew init --assist`, an opt-in read-only Codex drafting path that
+  prints suggested bootstrap, verify, base-branch, and crew-rule defaults before
+  writing anything; non-TTY runs print only the draft.
 - Added optional plan frontmatter `backlog` mappings, deterministic plan-review
   validation against unchecked BACKLOG items, and runner-owned post-merge
   BACKLOG checkoff with history notes for missing or ambiguous matches.
