@@ -6,6 +6,10 @@
   proposal passes, persist one stable JSON artifact under `.nightcrew/proposals/`,
   list pending proposals, and select item ids into `crew.md` BACKLOG before
   archiving the artifact. Adds `routing.propose` (`light` by default).
+- Proposal review now opens a Clack checkbox picker on TTY output after
+  generation and through `nightcrew propose review [--latest|<file>]`, reusing
+  the same append-to-`crew.md` and archive path as `propose select`; non-TTY
+  runs print numbered items with a `propose select --ids` hint.
 
 ## 1.1.0
 

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../src/cli/program";
+import { reviewProposal, runPropose } from "../src/cli/propose";
 import {
   listPendingProposals,
   readProposalArtifact,
@@ -10,6 +11,11 @@ import {
 import { makeTempProject, type TestProject } from "./helpers";
 
 let project: TestProject | undefined;
+
+function requireProject(): TestProject {
+  if (!project) throw new Error("test project was not initialized");
+  return project;
+}
 
 async function captureConsole(
   action: () => Promise<void>,
@@ -102,6 +108,7 @@ describe("nightcrew propose", () => {
     expect(output.stdout).toContain(`created ${relPath}`);
     expect(output.stdout).toContain("1. Minimal candidate");
     expect(output.stdout).toContain("3. Risk candidate");
+    expect(output.stdout).toContain("select with: nightcrew propose select --ids 1,3");
 
     const artifact = readProposalArtifact(file);
     expect(artifact).toMatchObject({
@@ -124,6 +131,47 @@ describe("nightcrew propose", () => {
       runCli(["propose", "Add proposal workflow", "--root", project?.root ?? ""]),
     );
     expect(listPendingProposals(project.ctx().paths).map((entry) => entry.file)).toEqual([file]);
+  });
+
+  it("selects generated proposal items through the interactive helper and archives the artifact", async () => {
+    project = await makeTempProject();
+    project.setConfig({
+      provider: {
+        default: "fake",
+        fake: { script: project.scriptFile },
+        codex: { tiers: { light: "proposal-light" } },
+      },
+    });
+    project.setScript(proposalScriptEntries("proposal-light"));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-03T09:30:00.000Z"));
+
+    const output = await captureConsole(async () => {
+      await runPropose(requireProject().ctx(), "Add interactive selection", {
+        isTty: true,
+        prompt: async (proposal) => {
+          expect(proposal.items.map((item) => item.id)).toEqual(["1", "2", "3"]);
+          return ["2"];
+        },
+      });
+    });
+
+    const relPath = ".nightcrew/proposals/2026-07-03-add-interactive-selection.json";
+    const file = join(project.root, relPath);
+    const archived = join(
+      project.ctx().paths.archivedProposalsDir,
+      "2026-07-03-add-interactive-selection.json",
+    );
+    const crew = readFileSync(project.ctx().paths.crewFile, "utf8");
+    expect(output.stderr).toBe("");
+    expect(output.stdout).toContain(`created ${relPath}`);
+    expect(output.stdout).toContain("selected 1 item");
+    expect(output.stdout).toContain("archived .nightcrew/proposals/archive/");
+    expect(crew).toContain(candidate("Architecture candidate", "architecture").body);
+    expect(crew).not.toContain(candidate("Minimal candidate", "minimal").body);
+    expect(crew).not.toContain(candidate("Risk candidate", "risk").body);
+    expect(existsSync(file)).toBe(false);
+    expect(existsSync(archived)).toBe(true);
   });
 
   it("lists pending proposals, selects bodies verbatim, and archives the artifact", async () => {
@@ -174,6 +222,72 @@ describe("nightcrew propose", () => {
       runCli(["propose", "list", "--root", project?.root ?? ""]),
     );
     expect(afterList.stdout).toBe("no pending proposals");
+  });
+
+  it("reviews stored proposals in non-TTY mode without changing crew.md", async () => {
+    project = await makeTempProject();
+    project.setCrew(["Keep existing backlog item"]);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-03T10:30:00.000Z"));
+    const { file, proposal } = writeProposalArtifact(project.ctx().paths, {
+      goal: "Review stored proposal",
+      routingTier: "light",
+      passes: [],
+      items: [
+        { ...candidate("Review first", "first"), lens: "minimal_path" },
+        { ...candidate("Review second", "second"), lens: "architecture_first" },
+      ],
+    });
+    const beforeCrew = readFileSync(project.ctx().paths.crewFile, "utf8");
+
+    const latest = await captureConsole(() =>
+      runCli(["propose", "review", "--latest", "--root", project?.root ?? ""]),
+    );
+    expect(latest.stderr).toBe("");
+    expect(latest.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
+    expect(latest.stdout).toContain("1. Review first");
+    expect(latest.stdout).toContain(candidate("Review first", "first").body);
+    expect(latest.stdout).toContain(
+      `select with: nightcrew propose select --ids 1,3 --proposal ${proposal.id}`,
+    );
+    expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
+    expect(existsSync(file)).toBe(true);
+
+    const byFile = await captureConsole(() =>
+      runCli(["propose", "review", file, "--root", project?.root ?? ""]),
+    );
+    expect(byFile.stderr).toBe("");
+    expect(byFile.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
+    expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
+    expect(existsSync(file)).toBe(true);
+  });
+
+  it("leaves crew.md and the artifact untouched when interactive review selects nothing", async () => {
+    project = await makeTempProject();
+    const { file, proposal } = writeProposalArtifact(project.ctx().paths, {
+      goal: "Maybe later",
+      routingTier: "light",
+      passes: [],
+      items: [{ ...candidate("Deferred item", "deferred"), lens: "minimal_path" }],
+    });
+    const beforeCrew = readFileSync(project.ctx().paths.crewFile, "utf8");
+
+    const output = await captureConsole(async () => {
+      await reviewProposal(
+        requireProject().ctx(),
+        { file: proposal.id },
+        {
+          isTty: true,
+          prompt: async () => [],
+        },
+      );
+    });
+
+    expect(output.stderr).toBe("");
+    expect(output.stdout).toContain(`reviewing .nightcrew/proposals/${proposal.id}.json`);
+    expect(output.stdout).toContain("no items selected; proposal left pending");
+    expect(readFileSync(project.ctx().paths.crewFile, "utf8")).toBe(beforeCrew);
+    expect(existsSync(file)).toBe(true);
   });
 
   it("does not write an artifact when a proposal pass fails", async () => {

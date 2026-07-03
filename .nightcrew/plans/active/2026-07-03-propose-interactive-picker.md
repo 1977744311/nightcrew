@@ -9,10 +9,10 @@ parallel: false
 Close the review gap for generated proposal artifacts by adding the authorized TTY checkbox picker and stored-proposal review flow, reusing the existing propose approval/archive path so interactive and non-interactive selections behave identically.
 
 ## Acceptance
-- [ ] `nightcrew propose "<goal>"` opens a `@clack/prompts` checkbox picker only when stdout is a TTY; selected items append through the same crew.md merge and proposal archive path as `propose select`.
-- [ ] `nightcrew propose review [--latest|<file>]` loads a stored proposal, supports the same interactive picker, and aborting or selecting nothing makes no crew.md changes.
-- [ ] Non-TTY generation and review print numbered proposal items plus a hint to use `propose select --ids`, without attempting raw terminal interaction.
-- [ ] Tests cover selection/merge reuse and the non-TTY fallback while leaving the raw TTY event loop untested.
+- [x] `nightcrew propose "<goal>"` opens a `@clack/prompts` checkbox picker only when stdout is a TTY; selected items append through the same crew.md merge and proposal archive path as `propose select`.
+- [x] `nightcrew propose review [--latest|<file>]` loads a stored proposal, supports the same interactive picker, and aborting or selecting nothing makes no crew.md changes.
+- [x] Non-TTY generation and review print numbered proposal items plus a hint to use `propose select --ids`, without attempting raw terminal interaction.
+- [x] Tests cover selection/merge reuse and the non-TTY fallback while leaving the raw TTY event loop untested.
 
 ## Steps
 1. Inspect the completed propose workflow implementation, CLI command structure, and existing proposal tests to identify the approval/archive seam to reuse.
