@@ -27,6 +27,11 @@ export { NIGHTCREW_DIR, type ProjectPaths, projectPaths } from "./core/paths";
 export * from "./core/types";
 export { type LoopOptions, type LoopResult, runLoop } from "./loop/loop";
 export { type RunnerDeps, type RunOptions, runIteration } from "./loop/runner";
+export {
+  aggregatePlanHistory,
+  type PlanHistoryMetric,
+  type PlanMetricStatus,
+} from "./plans/accounting";
 export { findPlan, listPlans, parsePlanFile, validatePlan } from "./plans/plans";
 export { generateProposal, PROPOSAL_OUTPUT_SCHEMA } from "./proposals/generate";
 export {

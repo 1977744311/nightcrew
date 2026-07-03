@@ -155,6 +155,16 @@ function h(tag, attrs, children) {
 
 function fmtTime(iso) { return iso ? iso.slice(5, 16).replace("T", " ") : ""; }
 
+function fmtDuration(ms) {
+  var seconds = Math.max(0, Math.round((ms || 0) / 1000));
+  var hours = Math.floor(seconds / 3600);
+  var minutes = Math.floor((seconds % 3600) / 60);
+  var rest = seconds % 60;
+  if (hours) return hours + "h " + String(minutes).padStart(2, "0") + "m";
+  if (minutes) return minutes + "m " + String(rest).padStart(2, "0") + "s";
+  return seconds + "s";
+}
+
 function stateBadges(s) {
   var out = [];
   if (!s) return out;
@@ -231,6 +241,37 @@ function renderProposals(d) {
   ]);
 }
 
+function renderPlanMetrics(d) {
+  var plans = d.planMetrics || [];
+  if (!plans.length) {
+    return h("section", {}, [
+      h("h3", {}, ["plan accounting"]),
+      h("div", { class: "panel" }, [h("span", { class: "muted" }, ["none"])]),
+    ]);
+  }
+  return h("section", {}, [
+    h("h3", {}, ["plan accounting"]),
+    h("table", {}, [
+      h("thead", {}, [
+        h("tr", {}, ["plan", "title", "iter", "tokens", "duration", "status"].map(function (t) {
+          return h("th", {}, [t]);
+        })),
+      ]),
+      h("tbody", {}, plans.map(function (p) {
+        var status = p.status || (p.landed ? "landed" : "pending");
+        return h("tr", {}, [
+          h("td", { class: "muted" }, [p.planId]),
+          h("td", {}, [p.title]),
+          h("td", {}, [String(p.iterations)]),
+          h("td", {}, [Number(p.totalTokens || 0).toLocaleString()]),
+          h("td", { class: "muted" }, [fmtDuration(p.durationMs)]),
+          h("td", { class: status === "landed" ? "st-success" : "muted" }, [status]),
+        ]);
+      })),
+    ]),
+  ]);
+}
+
 function renderBoard(projects) {
   if (es) { es.close(); es = null; }
   var cards = projects.map(function (p) {
@@ -279,6 +320,7 @@ function renderDetail(d) {
       h("section", {}, [h("h3", {}, ["active plans (" + d.plans.active.length + ")"]),
         h("div", { class: "panel" }, [d.plans.active.length ? h("ul", { class: "plans" }, planItems) : h("span", { class: "muted" }, ["none"])])]),
       renderProposals(d),
+      renderPlanMetrics(d),
       h("section", {}, [h("h3", {}, ["token curve"]), h("div", { class: "panel" }, [sparkline(d.history)])]),
       h("section", {}, [h("h3", {}, ["live events"]), h("div", { class: "panel" }, [log])]),
       h("section", {}, [h("h3", {}, ["iterations"]),

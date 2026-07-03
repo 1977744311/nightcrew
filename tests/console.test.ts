@@ -1,9 +1,11 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createConsoleHandler } from "../src/console/server";
+import type { IterationRecord, TokenUsage } from "../src/core/types";
 import { appendItemsToBacklog, writeProposalArtifact } from "../src/proposals/proposals";
+import { appendHistory } from "../src/state/history";
 import { makeTempProject, planFileContents, type TestProject } from "./helpers";
 
 let project: TestProject;
@@ -78,6 +80,33 @@ function candidate(title: string, lens: string) {
   };
 }
 
+function usage(inputTokens: number, outputTokens = 0, reasoningOutputTokens = 0): TokenUsage {
+  return {
+    inputTokens,
+    cachedInputTokens: 0,
+    outputTokens,
+    reasoningOutputTokens,
+  };
+}
+
+function record(startedAt: string, options: Partial<IterationRecord> = {}): IterationRecord {
+  return {
+    id: `iteration-${startedAt}`,
+    projectName: "demo",
+    startedAt,
+    endedAt: startedAt,
+    durationMs: 1,
+    operation: "execute",
+    planId: null,
+    status: "success",
+    commits: [],
+    controlOnly: false,
+    usage: null,
+    merged: false,
+    ...options,
+  };
+}
+
 describe("console API", () => {
   it("serves the board, project detail, and the HTML shell", async () => {
     project = await makeTempProject();
@@ -127,6 +156,95 @@ describe("console API", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("exposes stable per-plan metrics on project detail", async () => {
+    project = await makeTempProject();
+    writeFileSync(
+      join(project.root, ".nightcrew/plans/completed/2026-07-02-ship.md"),
+      planFileContents("2026-07-02-ship", "Ship the feature"),
+    );
+    writeFileSync(
+      join(project.root, ".nightcrew/plans/active/2026-07-02-polish.md"),
+      planFileContents("2026-07-02-polish", "Polish the feature"),
+    );
+
+    appendHistory(
+      project.ctx().paths,
+      record("2026-07-02T10:00:00.000Z", {
+        planId: "2026-07-02-ship",
+        durationMs: 2_000,
+        usage: usage(200, 20, 5),
+      }),
+    );
+    appendHistory(
+      project.ctx().paths,
+      record("2026-07-02T10:30:00.000Z", {
+        planId: "2026-07-02-ship",
+        durationMs: 4_000,
+        merged: true,
+        usage: usage(40),
+      }),
+    );
+    appendHistory(
+      project.ctx().paths,
+      record("2026-07-02T11:00:00.000Z", {
+        planId: "2026-07-02-polish",
+        durationMs: 90_000,
+        status: "failed",
+        failure: { kind: "provider_error", message: "provider failed" },
+        usage: usage(10),
+      }),
+    );
+    appendHistory(
+      project.ctx().paths,
+      record("2026-07-02T11:30:00.000Z", {
+        operation: "garden",
+        durationMs: 9_000,
+        usage: usage(1_000),
+      }),
+    );
+
+    listen();
+    const detail = (await request("/api/projects/demo")).json<{
+      planMetrics: Array<{
+        planId: string;
+        title: string;
+        iterations: number;
+        totalTokens: number;
+        durationMs: number;
+        status: string;
+        landed: boolean;
+        usage: TokenUsage | null;
+      }>;
+      history: unknown[];
+      budget: { iterations: number; totalTokens: number };
+    }>();
+
+    expect(detail.planMetrics).toEqual([
+      {
+        planId: "2026-07-02-ship",
+        title: "Ship the feature",
+        iterations: 2,
+        totalTokens: 265,
+        durationMs: 6_000,
+        status: "landed",
+        landed: true,
+        usage: usage(240, 20, 5),
+      },
+      {
+        planId: "2026-07-02-polish",
+        title: "Polish the feature",
+        iterations: 1,
+        totalTokens: 10,
+        durationMs: 90_000,
+        status: "pending",
+        landed: false,
+        usage: usage(10),
+      },
+    ]);
+    expect(detail.history.length).toBe(4);
+    expect(detail.budget).toMatchObject({ iterations: 4, totalTokens: 1_275 });
+  });
+
   it("serves pending proposal items on project detail for page rendering", async () => {
     project = await makeTempProject();
     const first = candidate("Console approval", "minimal");
@@ -145,7 +263,13 @@ describe("console API", () => {
     listen(false);
     const page = (await request("/")).text;
     expect(page).toContain("function renderProposals");
+    expect(page).toContain("function renderPlanMetrics");
+    expect(page).toContain("renderPlanMetrics(d)");
+    expect(page).toContain("plan accounting");
+    expect(page).toContain("duration");
     expect(page).toContain("pending proposals");
+    expect(page).toContain("token curve");
+    expect(page).toContain("iterations");
     expect(page).toContain('inputAttrs.disabled = "disabled"');
 
     const detail = (await request("/api/projects/demo")).json<{

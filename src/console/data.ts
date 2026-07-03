@@ -3,6 +3,7 @@ import { loadProject, type ProjectContext } from "../config/load";
 import { readRegistry } from "../config/registry";
 import { projectPaths } from "../core/paths";
 import type { IterationRecord, PlanDoc, RuntimeState } from "../core/types";
+import { aggregatePlanHistory, type PlanHistoryMetric } from "../plans/accounting";
 import { listPlans } from "../plans/plans";
 import { type BudgetSummary, summarizeBudget } from "../policy/budget";
 import { listPendingProposals, type ProposalItem } from "../proposals/proposals";
@@ -35,6 +36,7 @@ export interface ProjectDetail {
     createdAt: string;
     items: Array<Pick<ProposalItem, "id" | "title" | "body" | "lens">>;
   }>;
+  planMetrics: PlanHistoryMetric[];
   history: IterationRecord[];
   budget: BudgetSummary;
 }
@@ -121,6 +123,7 @@ export function detail(root: string): ProjectDetail {
         lens: item.lens,
       })),
     })),
+    planMetrics: aggregatePlanHistory(ctx, history),
     history,
     budget: summarizeBudget(history),
   };

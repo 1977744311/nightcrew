@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added shared per-plan history accounting and surfaced those metrics in the
+  console project detail JSON and page while keeping `nightcrew report`
+  summary behavior stable.
+
 ## 1.2.0
 
 The propose release: goal in, ratified backlog out. All three features below
