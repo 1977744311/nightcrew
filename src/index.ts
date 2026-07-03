@@ -46,6 +46,11 @@ export {
   type PlanHistoryMetric,
   type PlanMetricStatus,
 } from "./plans/accounting";
+export {
+  type BacklogCheckoffResult,
+  checkOffBacklogItem,
+  uncheckedBacklogMatchCount,
+} from "./plans/backlog";
 export { findPlan, listPlans, parsePlanFile, validatePlan } from "./plans/plans";
 export {
   type GenerateProposalOptions,

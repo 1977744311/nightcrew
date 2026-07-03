@@ -115,7 +115,7 @@ export async function makeTempProject(
 export function planFileContents(
   id: string,
   title: string,
-  options: { parallel?: boolean } = {},
+  options: { parallel?: boolean; backlog?: string } = {},
 ): string {
   return [
     "---",
@@ -123,6 +123,7 @@ export function planFileContents(
     `title: ${title}`,
     `created: ${id.slice(0, 10)}`,
     `parallel: ${options.parallel ?? false}`,
+    ...(options.backlog ? [`backlog: ${JSON.stringify(options.backlog)}`] : []),
     "---",
     "",
     "## Goal",

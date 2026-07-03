@@ -5,6 +5,7 @@ import type { ProjectPaths } from "../core/paths";
 import type { PlanDoc, PlanStatus } from "../core/types";
 import { ensureDir, readTextIfExists } from "../utils/fs";
 import { dateStamp, slugify } from "../utils/id";
+import { uncheckedBacklogMatchCount } from "./backlog";
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
@@ -48,12 +49,17 @@ export function readPlan(file: string, status: PlanStatus): PlanDoc | null {
     typeof frontmatter.title === "string" && frontmatter.title.trim()
       ? frontmatter.title.trim()
       : (firstHeading(body) ?? fileId);
+  const backlog =
+    typeof frontmatter.backlog === "string" && frontmatter.backlog.trim()
+      ? frontmatter.backlog.trim()
+      : undefined;
   return {
     id,
     title,
     file,
     status,
     parallel: frontmatter.parallel === true,
+    backlog,
     maxIterations:
       typeof frontmatter.max_iterations === "number" ? frontmatter.max_iterations : undefined,
     createdAt: typeof frontmatter.created === "string" ? frontmatter.created : undefined,
@@ -169,13 +175,28 @@ export function movePlan(paths: ProjectPaths, plan: PlanDoc, to: PlanStatus): st
   return target;
 }
 
+export interface ValidatePlanOptions {
+  crew?: string;
+}
+
 /** Basic structural validation used by plan review and `nightcrew plan lint`. */
-export function validatePlan(plan: PlanDoc): string[] {
+export function validatePlan(plan: PlanDoc, options: ValidatePlanOptions = {}): string[] {
   const problems: string[] = [];
   if (!/^[a-z0-9][a-z0-9-]*$/.test(plan.id)) {
     problems.push(`plan id "${plan.id}" should be kebab-case (got file ${basename(plan.file)})`);
   }
   if (!plan.body.trim()) problems.push("plan body is empty");
   if (plan.body.length > 20_000) problems.push("plan body exceeds 20k chars; scope it down");
+  if ("backlog" in plan.frontmatter && !plan.backlog) {
+    problems.push("plan frontmatter backlog must be a non-empty string when present");
+  }
+  if (plan.backlog && options.crew !== undefined) {
+    const matches = uncheckedBacklogMatchCount(options.crew, plan.backlog);
+    if (matches !== 1) {
+      problems.push(
+        `plan frontmatter backlog must match exactly one unchecked BACKLOG item; found ${matches} for "${plan.backlog}"`,
+      );
+    }
+  }
   return problems;
 }

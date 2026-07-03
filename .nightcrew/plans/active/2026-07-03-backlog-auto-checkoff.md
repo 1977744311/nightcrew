@@ -3,16 +3,17 @@ id: 2026-07-03-backlog-auto-checkoff
 title: Add BACKLOG auto-checkoff
 created: 2026-07-03
 parallel: false
+backlog: "BACKLOG 完成项自动勾选：plan 操作在 frontmatter 里用可选 `backlog`"
 ---
 
 ## Goal
 Close the deterministic link between landed plans and the operator BACKLOG: plans can optionally declare the exact BACKLOG first line they cover, review validates that mapping, and the runner marks a uniquely matched unchecked item complete only after a successful merge. This keeps `.nightcrew/crew.md` accurate without expanding agent write authority.
 
 ## Acceptance
-- [ ] Plan frontmatter accepts an additive optional `backlog` field containing the exact BACKLOG first-line text, and plan review validates that it maps to one unchecked crew item.
-- [ ] After a successful merge, runner-owned deterministic code changes only the uniquely matched `- [ ]` BACKLOG line to `- [x]`.
-- [ ] Missing or non-unique matches produce a history note and leave `.nightcrew/crew.md` unchanged.
-- [ ] Agent write restrictions remain unchanged, `CHANGELOG.md` is updated under `## Unreleased`, and focused tests cover schema/review, successful checkoff, and no-op note paths.
+- [x] Plan frontmatter accepts an additive optional `backlog` field containing the exact BACKLOG first-line text, and plan review validates that it maps to one unchecked crew item.
+- [x] After a successful merge, runner-owned deterministic code changes only the uniquely matched `- [ ]` BACKLOG line to `- [x]`.
+- [x] Missing or non-unique matches produce a history note and leave `.nightcrew/crew.md` unchanged.
+- [x] Agent write restrictions remain unchanged, `CHANGELOG.md` is updated under `## Unreleased`, and focused tests cover schema/review, successful checkoff, and no-op note paths.
 
 ## Steps
 1. Extend the plan schema and review validation to accept and verify the optional `backlog` mapping without changing existing plan behavior.
