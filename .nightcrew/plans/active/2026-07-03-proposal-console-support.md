@@ -9,10 +9,10 @@ parallel: false
 Close the console seam for proposals so operators can review pending proposal items from the project detail page and, when actions are enabled, approve selected items through the same append-and-archive path already used by the CLI workflow.
 
 ## Acceptance
-- [ ] The project detail page lists pending proposal items with title, backlog-ready body, source lens, and selectable checkboxes.
-- [ ] With `--actions` enabled, approving selected proposal item ids POSTs to a new endpoint that appends those items to `.nightcrew/crew.md` and archives the proposal artifact through the shared approval path.
-- [ ] Without `--actions`, proposal items render read-only and the approval endpoint returns 404.
-- [ ] Tests cover pending proposal rendering, action-enabled approval, action-disabled 404 behavior, and reuse of the shared append/archive selection logic.
+- [x] The project detail page lists pending proposal items with title, backlog-ready body, source lens, and selectable checkboxes.
+- [x] With `--actions` enabled, approving selected proposal item ids POSTs to a new endpoint that appends those items to `.nightcrew/crew.md` and archives the proposal artifact through the shared approval path.
+- [x] Without `--actions`, proposal items render read-only and the approval endpoint returns 404.
+- [x] Tests cover pending proposal rendering, action-enabled approval, action-disabled 404 behavior, and reuse of the shared append/archive selection logic.
 
 ## Steps
 1. Locate the console project detail route, action gating, proposal storage helpers, and existing CLI approval code path.
