@@ -9,9 +9,9 @@ parallel: false
 Close the preflight seam between environment validation and the Codex-only runtime path by making doctor, loop, and crew start verify that a configured Codex provider can authenticate before spending an unattended iteration, while fake provider flows report skip for tests and local demos.
 
 ## Acceptance
-- [ ] `nightcrew doctor` reports a provider check that passes for configured Codex credentials, fails with a clear `codex login` hint when Codex auth is missing, and reports skip for the fake provider without changing existing check behavior.
-- [ ] `nightcrew loop` and `crew start` run the same provider preflight before starting work, fail fast for missing Codex auth, and keep fake provider startup testable with deterministic coverage.
-- [ ] Tests cover doctor output/status, loop/start fail-fast behavior, fake-provider skip, and the auth detection path without requiring real Codex credentials.
+- [x] `nightcrew doctor` reports a provider check that passes for configured Codex credentials, fails with a clear `codex login` hint when Codex auth is missing, and reports skip for the fake provider without changing existing check behavior.
+- [x] `nightcrew loop` and `crew start` run the same provider preflight before starting work, fail fast for missing Codex auth, and keep fake provider startup testable with deterministic coverage.
+- [x] Tests cover doctor output/status, loop/start fail-fast behavior, fake-provider skip, and the auth detection path without requiring real Codex credentials.
 
 ## Steps
 1. Inventory current doctor checks, provider config loading, loop/start entry points, and existing fake-provider test seams.
