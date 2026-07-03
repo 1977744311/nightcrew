@@ -1,4 +1,5 @@
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderDoctorReport, runDoctorChecks } from "../src/cli/doctor";
 import { runCli } from "../src/cli/program";
@@ -56,6 +57,7 @@ describe("nightcrew doctor", () => {
         "git executable",
         "git repository",
         "config",
+        "provider auth",
         "bootstrap commands",
         "verify commands",
         "base branch",
@@ -141,6 +143,41 @@ describe("nightcrew doctor", () => {
     expect(report.checks.find((check) => check.name === "daemon lock")?.detail).toContain(
       "stale lock",
     );
+  });
+
+  it("reports fake skip, Codex auth pass, and Codex auth failure", async () => {
+    project = await makeTempProject(healthyConfig());
+
+    const fakeReport = await runDoctorChecks(project.root);
+    const fakeCheck = fakeReport.checks.find((check) => check.name === "provider auth");
+    expect(fakeCheck).toMatchObject({ ok: true, status: "skip" });
+    expect(renderDoctorReport(fakeReport)).toContain("SKIP");
+
+    const codexHome = join(project.home, "codex");
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(join(codexHome, "auth.json"), JSON.stringify({ tokens: { access: "test" } }));
+    project.setConfig({
+      ...healthyConfig(),
+      provider: { default: "codex" },
+    });
+
+    const codexReport = await runDoctorChecks(project.root, {
+      providerPreflight: { codexHome },
+    });
+    expect(codexReport.ok).toBe(true);
+    expect(codexReport.checks.find((check) => check.name === "provider auth")).toMatchObject({
+      ok: true,
+      status: "pass",
+    });
+
+    const missingReport = await runDoctorChecks(project.root, {
+      providerPreflight: { codexHome: join(project.home, "missing-codex") },
+    });
+    const missingCheck = missingReport.checks.find((check) => check.name === "provider auth");
+    expect(missingReport.ok).toBe(false);
+    expect(missingCheck).toMatchObject({ ok: false, status: "fail" });
+    expect(missingCheck?.detail).toContain("codex login");
+    expect(renderDoctorReport(missingReport)).toContain("FAIL");
   });
 
   it("sets the CLI exit code from the report and prints the table", async () => {

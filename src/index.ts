@@ -84,6 +84,14 @@ export {
   writeProposalArtifact,
 } from "./proposals/proposals";
 export { buildProvider, type ProviderOperation, webSearchModeFor } from "./providers/factory";
+export {
+  assertProviderPreflight,
+  ProviderPreflightError,
+  type ProviderPreflightOptions,
+  type ProviderPreflightResult,
+  type ProviderPreflightStatus,
+  preflightProvider,
+} from "./providers/preflight";
 export { renderPrompt } from "./providers/render";
 export type {
   Provider,

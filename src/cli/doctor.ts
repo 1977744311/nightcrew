@@ -7,12 +7,18 @@ import { type Registry, readRegistry } from "../config/registry";
 import { configSchema, type NightcrewConfig } from "../config/schema";
 import { type ProjectPaths, projectPaths } from "../core/paths";
 import { type GitResult, git } from "../git/git";
+import {
+  type ProviderPreflightOptions,
+  type ProviderPreflightStatus,
+  preflightProvider,
+} from "../providers/preflight";
 
 const MIN_NODE_MAJOR = 20;
 
 export interface DoctorCheckResult {
   name: string;
   ok: boolean;
+  status?: ProviderPreflightStatus;
   detail: string;
 }
 
@@ -27,18 +33,28 @@ export interface DoctorCheckOptions {
   git?: (args: string[], cwd: string) => Promise<GitResult>;
   registry?: Registry | (() => Registry);
   isProcessAlive?: (pid: number) => boolean;
+  providerPreflight?: ProviderPreflightOptions;
 }
 
-function check(name: string, ok: boolean, detail: string): DoctorCheckResult {
-  return { name, ok, detail };
+function check(
+  name: string,
+  ok: boolean,
+  detail: string,
+  status?: ProviderPreflightStatus,
+): DoctorCheckResult {
+  return { name, ok, detail, status };
 }
 
 function pass(name: string, detail: string): DoctorCheckResult {
-  return check(name, true, detail);
+  return check(name, true, detail, "pass");
 }
 
 function fail(name: string, detail: string): DoctorCheckResult {
-  return check(name, false, detail);
+  return check(name, false, detail, "fail");
+}
+
+function skip(name: string, detail: string): DoctorCheckResult {
+  return check(name, true, detail, "skip");
 }
 
 function plural(count: number, noun: string): string {
@@ -232,6 +248,17 @@ function daemonLockCheck(paths: ProjectPaths, options: DoctorCheckOptions): Doct
       );
 }
 
+function providerAuthCheck(
+  config: NightcrewConfig | null,
+  options: DoctorCheckOptions,
+): DoctorCheckResult {
+  if (!config) return fail("provider auth", "config did not load");
+
+  const result = preflightProvider(config, options.providerPreflight);
+  if (result.status === "skip") return skip(result.name, result.detail);
+  return result.ok ? pass(result.name, result.detail) : fail(result.name, result.detail);
+}
+
 export async function runDoctorChecks(
   root: string,
   options: DoctorCheckOptions = {},
@@ -290,6 +317,7 @@ export async function runDoctorChecks(
 
   checks.push(...bootstrapCommandChecks(configInput));
   checks.push(...verifyCommandChecks(configInput, config));
+  checks.push(providerAuthCheck(config, options));
   checks.push(await baseBranchCheck(normalizedRoot, config, repoOk, runGit));
   checks.push(registryCheck(normalizedRoot, options));
   checks.push(daemonLockCheck(paths, options));
@@ -311,7 +339,8 @@ export function renderDoctorReport(report: DoctorReport): string {
   ];
 
   for (const result of report.checks) {
-    const status = result.ok ? pc.green("PASS") : pc.red("FAIL");
+    const status =
+      result.status === "skip" ? pc.yellow("SKIP") : result.ok ? pc.green("PASS") : pc.red("FAIL");
     lines.push(`${result.name.padEnd(nameWidth)}  ${status.padEnd(6)}  ${result.detail}`);
   }
 

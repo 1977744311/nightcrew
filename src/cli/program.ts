@@ -376,6 +376,7 @@ export function buildProgram(): Command {
             `${project.name}: ${project.iterations} iterations${project.error ? pc.red(` (${project.error})`) : ""}`,
           );
         }
+        if (result.projects.some((project) => project.error)) process.exitCode = 1;
       },
     );
 
