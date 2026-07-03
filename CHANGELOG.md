@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added `README.zh-CN.md` as the maintained Simplified Chinese README and
+  included it in the npm package file whitelist.
 - Added a source-bound launch write-up draft at `docs/launch.md` covering
   unattended-loop failure modes, nightcrew's guard/review/worktree answers, and
   the 1.1-1.3 dogfood story.
