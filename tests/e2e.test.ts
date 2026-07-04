@@ -419,7 +419,12 @@ describe("single-project vertical slice", () => {
       {
         match: "operation = \\*\\*repair\\*\\*",
         actions: [
-          { type: "exec", command: "git merge main || true" },
+          // Identity flags matter: without them git refuses to even start the
+          // merge on machines with no git identity (hosted CI runners).
+          {
+            type: "exec",
+            command: "git -c user.name=fake -c user.email=fake@nightcrew.local merge main || true",
+          },
           { type: "write", path: "data.txt", content: "resolved: crew + operator\n" },
           { type: "commit", message: "resolve merge conflict with main" },
         ],
