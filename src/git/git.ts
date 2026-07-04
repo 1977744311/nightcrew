@@ -112,7 +112,17 @@ export async function diffBetween(
   return `${text.slice(0, maxChars)}\n... [diff truncated at ${maxChars} chars]`;
 }
 
-const FALLBACK_IDENTITY = ["-c", "user.name=nightcrew", "-c", "user.email=agent@nightcrew.local"];
+export const FALLBACK_IDENTITY = [
+  "-c",
+  "user.name=nightcrew",
+  "-c",
+  "user.email=agent@nightcrew.local",
+];
+
+/** True when git refused to commit because no author identity is configured. */
+export function missingIdentity(result: GitResult): boolean {
+  return /tell me who you are|user\.name|user\.email/i.test(result.stderr);
+}
 
 /** Stage everything and commit. Returns the new sha, or null when nothing to commit. */
 export async function addAllAndCommit(cwd: string, message: string): Promise<string | null> {
@@ -120,7 +130,7 @@ export async function addAllAndCommit(cwd: string, message: string): Promise<str
   const staged = await git(["diff", "--cached", "--quiet"], cwd);
   if (staged.ok) return null; // nothing staged
   let commit = await git(["commit", "-m", message], cwd);
-  if (!commit.ok && /tell me who you are|user\.name|user\.email/i.test(commit.stderr)) {
+  if (!commit.ok && missingIdentity(commit)) {
     commit = await git([...FALLBACK_IDENTITY, "commit", "-m", message], cwd);
   }
   if (!commit.ok) {
@@ -140,7 +150,7 @@ export async function commitPaths(
   const staged = await git(["diff", "--cached", "--quiet"], cwd);
   if (staged.ok) return null;
   let commit = await git(["commit", "-m", message, "--", ...paths], cwd);
-  if (!commit.ok && /tell me who you are|user\.name|user\.email/i.test(commit.stderr)) {
+  if (!commit.ok && missingIdentity(commit)) {
     commit = await git([...FALLBACK_IDENTITY, "commit", "-m", message, "--", ...paths], cwd);
   }
   if (!commit.ok) {

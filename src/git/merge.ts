@@ -1,4 +1,4 @@
-import { currentBranch, git, statusEntries } from "./git";
+import { currentBranch, FALLBACK_IDENTITY, git, missingIdentity, statusEntries } from "./git";
 
 export type MergeOutcome =
   | { result: "merged"; sha: string }
@@ -38,7 +38,12 @@ export async function mergeBranch(
     return { result: "nothing" };
   }
 
-  const merge = await git(["merge", "--no-ff", branch, "-m", message], root);
+  let merge = await git(["merge", "--no-ff", branch, "-m", message], root);
+  if (!merge.ok && missingIdentity(merge)) {
+    // The merge commit needs an author (CI runners often have none configured).
+    await git(["merge", "--abort"], root);
+    merge = await git([...FALLBACK_IDENTITY, "merge", "--no-ff", branch, "-m", message], root);
+  }
   if (!merge.ok) {
     await git(["merge", "--abort"], root);
     return { result: "conflict", detail: merge.stderr || merge.stdout };
@@ -55,10 +60,12 @@ export async function mergeBaseIntoWorktree(
   worktreePath: string,
   baseBranch: string,
 ): Promise<{ ok: boolean; conflicted: boolean; detail: string }> {
-  const merge = await git(
-    ["merge", baseBranch, "-m", `nightcrew: merge ${baseBranch} into plan branch`],
-    worktreePath,
-  );
+  const message = `nightcrew: merge ${baseBranch} into plan branch`;
+  let merge = await git(["merge", baseBranch, "-m", message], worktreePath);
+  if (!merge.ok && missingIdentity(merge)) {
+    await git(["merge", "--abort"], worktreePath);
+    merge = await git([...FALLBACK_IDENTITY, "merge", baseBranch, "-m", message], worktreePath);
+  }
   if (merge.ok) return { ok: true, conflicted: false, detail: merge.stdout };
   const conflicted = /conflict/i.test(merge.stdout + merge.stderr);
   if (!conflicted) await git(["merge", "--abort"], worktreePath);
