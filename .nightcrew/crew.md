@@ -21,6 +21,11 @@ Operator surface. The crew reads this every iteration; only the operator edits i
   output must stay English — `tests/localized-readme.test.ts` scans tracked
   files outside `.nightcrew/` and `README.zh-CN.md` and fails verify on any
   Han character.
+- Any plan that changes user-visible behavior (a command, flag, config key,
+  control-surface file, or console feature) must update the matching
+  sections of BOTH `README.md` and `README.zh-CN.md` within that same plan.
+  The two READMEs must stay content-equivalent; CHANGELOG alone is not
+  enough.
 
 ## BACKLOG
 
