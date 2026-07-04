@@ -42,6 +42,11 @@ verify:
         - { name: test, run: npm test, timeoutMs: 600000 }
         - { name: typecheck, run: npx tsc --noEmit }
 
+canary:
+  profile: smoke                    # verify profile run as the scheduled real-world smoke;
+                                    # unset (default) disables the canary
+  everyHours: 20                    # at most one attempt (pass or fail) per window
+
 loop:
   maxIterations: 20                 # per `nightcrew loop` session
   maxFailureStreak: 3               # consecutive failures -> typed stop
@@ -84,6 +89,15 @@ plan branch as `nightcrew/<plan-id>` and runs `gh pr create --base <baseBranch>`
 instead of merging locally. `nightcrew doctor` requires the `gh` executable only
 when PR mode is configured. `merge.policy: branch` remains the manual fallback:
 it leaves the reviewed branch for a human and does not open a PR.
+
+`canary.profile` names a verify profile whose steps run in the project root,
+outside any agent sandbox, before the loop (or the `crew` daemon) picks up
+work — at most once per `canary.everyHours`. Use it for what fake-provider
+tests structurally cannot prove: real provider calls, `gh` auth, webhook
+endpoints, deploy credentials. A failure never blocks the loop; it is appended
+to `qa.md` (deduped, so a broken integration does not restate itself nightly),
+surfaces as a pending fix proposal via qa triage, and fires the
+`canary_failed` notify event.
 
 ## Plan frontmatter
 

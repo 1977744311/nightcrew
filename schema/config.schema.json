@@ -254,6 +254,24 @@
       },
       "additionalProperties": false
     },
+    "canary": {
+      "default": {
+        "everyHours": 20
+      },
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "everyHours": {
+          "default": 20,
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
     "loop": {
       "default": {
         "maxIterations": 20,
@@ -408,7 +426,7 @@
     },
     "notify": {
       "default": {
-        "events": ["loop_stopped", "open_question", "proposal_landed"]
+        "events": ["loop_stopped", "open_question", "proposal_landed", "canary_failed"]
       },
       "type": "object",
       "properties": {
@@ -417,11 +435,11 @@
           "format": "uri"
         },
         "events": {
-          "default": ["loop_stopped", "open_question", "proposal_landed"],
+          "default": ["loop_stopped", "open_question", "proposal_landed", "canary_failed"],
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["loop_stopped", "open_question", "proposal_landed"]
+            "enum": ["loop_stopped", "open_question", "proposal_landed", "canary_failed"]
           }
         }
       },

@@ -28,6 +28,7 @@ export { type ConsoleOptions, createConsoleServer } from "./console/server";
 export { resolveOperation } from "./core/operations";
 export { NIGHTCREW_DIR, type ProjectPaths, projectPaths } from "./core/paths";
 export * from "./core/types";
+export { type CanaryOutcome, maybeRunCanary } from "./loop/canary";
 export { type LoopOptions, type LoopResult, runLoop } from "./loop/loop";
 export { type RunnerDeps, type RunOptions, runIteration } from "./loop/runner";
 export { maybeTriageQa, type QaTriageOutcome } from "./loop/triage";
@@ -89,6 +90,10 @@ export {
   writeProposalArtifact,
 } from "./proposals/proposals";
 export { buildProvider, type ProviderOperation, webSearchModeFor } from "./providers/factory";
+export {
+  assertStructuredOutputSchema,
+  structuredOutputSchemaViolations,
+} from "./providers/output-schema";
 export {
   assertProviderPreflight,
   ProviderPreflightError,

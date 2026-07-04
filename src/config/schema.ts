@@ -22,7 +22,12 @@ export type VerifyProfile = z.infer<typeof verifyProfileSchema>;
 const tierSchema = z.enum(["light", "heavy"]);
 const webSearchModeSchema = z.enum(["disabled", "cached", "live"]);
 const gitMergeModeSchema = z.enum(["merge", "pr"]);
-export const NOTIFY_EVENTS = ["loop_stopped", "open_question", "proposal_landed"] as const;
+export const NOTIFY_EVENTS = [
+  "loop_stopped",
+  "open_question",
+  "proposal_landed",
+  "canary_failed",
+] as const;
 const notifyEventSchema = z.enum(NOTIFY_EVENTS);
 const codexWebSearchOverridesSchema = z
   .strictObject({
@@ -109,6 +114,19 @@ export const configSchema = z.strictObject({
       profiles: z.record(z.string(), verifyProfileSchema).default({ default: { steps: [] } }),
     })
     .default({ profile: "default", profiles: { default: { steps: [] } } }),
+  /**
+   * Scheduled real-world smoke: run a verify profile outside the agent sandbox
+   * before loop work, so live-integration breakage surfaces overnight instead
+   * of waiting for the operator to trip over it.
+   */
+  canary: z
+    .strictObject({
+      /** Verify profile whose steps form the canary. Unset disables the canary. */
+      profile: z.string().min(1).optional(),
+      /** Minimum hours between canary runs (attempts count, pass or fail). */
+      everyHours: z.number().positive().default(20),
+    })
+    .default({ everyHours: 20 }),
   loop: z
     .strictObject({
       maxIterations: z.number().int().positive().default(20),

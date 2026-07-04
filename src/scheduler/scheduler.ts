@@ -1,6 +1,7 @@
 import type { ProjectContext } from "../config/load";
 import { resolveOperation } from "../core/operations";
 import type { IterationRecord } from "../core/types";
+import { maybeRunCanary } from "../loop/canary";
 import { type RunnerDeps, runIteration } from "../loop/runner";
 import { maybeTriageQa } from "../loop/triage";
 import { findPlan } from "../plans/plans";
@@ -162,14 +163,18 @@ export async function runProjectScheduler(
         });
       }
 
-      // New qa.md defects become a pending proposal (read-only, self-guarded).
-      await maybeTriageQa(ctx, deps.provider);
-
       // Reap finished lanes (explicit flag: racing a settled promise against
       // Promise.resolve() is order-dependent and must never gate this).
       for (const [planId, lane] of [...lanes]) {
         if (lane.done) lanes.delete(planId);
       }
+
+      // Canary steps run arbitrary commands in the project root, so they need
+      // exclusive occupancy — never alongside a lane that may merge into root.
+      if (lanes.size === 0) await maybeRunCanary(ctx);
+
+      // New qa.md defects become a pending proposal (read-only, self-guarded).
+      await maybeTriageQa(ctx, deps.provider);
 
       const resolved = resolveOperation(readState(paths), paths, config, undefined, [
         ...lanes.keys(),

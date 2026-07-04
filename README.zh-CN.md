@@ -78,8 +78,14 @@ nightcrew report           # the morning after
 仍然能追溯到你的一次点击 — agent 永远不会写 `crew.md`。
 
 不想主动轮询？配置 `notify.webhook` 后，loop 会在带类型停机、新 question
-落地、新 proposal 待审时 POST 一段紧凑 JSON——纯确定性代码、不调模型，
-推送失败也绝不拖垮 loop。
+落地、新 proposal 待审、canary 失败时 POST 一段紧凑 JSON——纯确定性代码、
+不调模型，推送失败也绝不拖垮 loop。
+
+fake-provider 测试证明不了真实集成（真的 provider 调用、`gh` 认证、你的
+部署凭证）。把 `canary.profile` 指向一个 verify profile，loop 就会在开工前
+于项目根目录、任何 agent 沙箱之外运行这些步骤，每 `canary.everyHours`
+小时最多一次。失败的步骤会被追加进 `qa.md`（夜里的自动分诊会就地起草修复
+候选），并触发 `canary_failed` webhook；loop 本身继续运行。
 
 ## 命令
 
@@ -121,7 +127,9 @@ review:
 git:
   mergeMode: merge    # merge 本地合并 | pr: 推送分支并开 GitHub PR
 notify:
-  webhook: https://example.com/hook   # 可选推送：停机、questions、proposals
+  webhook: https://example.com/hook   # 可选推送：停机、questions、proposals、canary
+canary:
+  profile: smoke      # 每晚在沙箱外真实跑一遍的 verify profile；失败写入 qa.md
 schedule:
   windows: ["23:00-07:00"]
 loop:

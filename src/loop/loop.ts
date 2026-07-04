@@ -6,6 +6,7 @@ import { emitEvent } from "../state/events";
 import { readState, updateState } from "../state/state";
 import { isoNow } from "../utils/id";
 import { log } from "../utils/log";
+import { maybeRunCanary } from "./canary";
 import { type RunnerDeps, runIteration } from "./runner";
 import { maybeTriageQa } from "./triage";
 
@@ -92,6 +93,9 @@ export async function runLoop(
       return { iterations, stop };
     }
 
+    // Canary before triage: a fresh canary failure lands in qa.md and the
+    // triage pass right after it drafts the fix proposal in the same wake-up.
+    await maybeRunCanary(ctx);
     await maybeTriageQa(ctx, deps.provider);
     const record = await runIteration(ctx, deps);
     iterations += 1;

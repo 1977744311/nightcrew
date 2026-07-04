@@ -167,6 +167,8 @@ export interface RuntimeState {
   lastOperation?: Operation;
   /** Last qa.md triage attempt: content hash + timestamp. Retries only when qa.md changes. */
   qaTriage?: { hash: string; at: string };
+  /** Last canary attempt (pass or fail). Reruns after config.canary.everyHours. */
+  canary?: { at: string; ok: boolean; profile: string };
   /** planId -> pending repair. One slot per plan so parallel plans fail independently. */
   pendingRepairs: Record<string, PendingRepair>;
   /** planId -> completed merge-review rounds for the current landing attempt. */

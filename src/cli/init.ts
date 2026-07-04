@@ -128,6 +128,10 @@ verify:
       #    run: npm test
       #    timeoutMs: 600000
 
+# canary:                   # scheduled real-world smoke, run outside the agent sandbox
+#   profile: canary         # verify profile to run before loop work; unset disables
+#   everyHours: 20          # at most one attempt per window; failures land in qa.md
+
 # loop:
 #   maxIterations: 20
 #   maxFailureStreak: 3

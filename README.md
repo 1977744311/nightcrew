@@ -115,8 +115,17 @@ traces back to one of your clicks — agents never write `crew.md`.
 
 Prefer a push over polling? Configure `notify.webhook` and the loop POSTs
 compact JSON when it stops with a typed reason, when a question lands,
-and when a proposal awaits approval — deterministic code, no model calls,
-and delivery failures never break the loop.
+when a proposal awaits approval, and when the canary fails —
+deterministic code, no model calls, and delivery failures never break
+the loop.
+
+Fake-provider tests cannot prove live integrations (a real provider
+call, `gh` auth, your deploy credentials). Point `canary.profile` at a
+verify profile and the loop runs those steps in the project root —
+outside any agent sandbox — at most once per `canary.everyHours`,
+before picking up work. A failing step is appended to `qa.md` (where
+overnight triage drafts fix candidates) and fires the `canary_failed`
+webhook; the loop itself keeps going.
 
 ## Commands
 
@@ -158,7 +167,9 @@ review:
 git:
   mergeMode: merge    # merge locally | pr: push + open a GitHub PR
 notify:
-  webhook: https://example.com/hook   # optional push: stops, questions, proposals
+  webhook: https://example.com/hook   # optional push: stops, questions, proposals, canary
+canary:
+  profile: smoke      # verify profile run nightly outside the sandbox; failures land in qa.md
 schedule:
   windows: ["23:00-07:00"]
 loop:

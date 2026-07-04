@@ -4,7 +4,7 @@ import { reviewModel, webSearchModeFor } from "../providers/factory";
 import type { Provider } from "../providers/types";
 import type { MergeReviewInput, PlanReviewInput, Reviewer } from "./types";
 
-const VERDICT_SCHEMA = {
+export const VERDICT_SCHEMA = {
   type: "object",
   properties: {
     verdict: { type: "string", enum: [...REVIEW_VERDICTS] },

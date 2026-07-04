@@ -31,6 +31,19 @@ verify:
         - name: test
           run: npm test
           timeoutMs: 900000
+    canary:
+      steps:
+        - name: build
+          run: npm run build
+          timeoutMs: 600000
+        - name: canary
+          run: node scripts/canary.mjs --live
+          timeoutMs: 1200000
+
+# Nightly real-world smoke: built CLI end-to-end + one live init --assist pass.
+canary:
+  profile: canary
+  everyHours: 20
 
 loop:
   maxIterations: 20

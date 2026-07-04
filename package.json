@@ -49,6 +49,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "schema": "node --experimental-strip-types scripts/generate-config-schema.mjs",
+    "canary": "node scripts/canary.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

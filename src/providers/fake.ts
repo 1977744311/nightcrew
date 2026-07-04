@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, resolve } from "node:path";
 import type { TokenUsage } from "../core/types";
 import { runShell } from "../utils/process";
+import { structuredOutputSchemaViolations } from "./output-schema";
 import type { Provider, ProviderRunOptions, ProviderRunResult } from "./types";
 import { Watchdog } from "./types";
 
@@ -121,14 +122,22 @@ export class FakeProvider implements Provider {
     cursor.consumed.push(index);
     writeCursor(this.scriptFile, cursor);
     const entry = script[index] as FakeScriptEntry;
+    // Mirror the real API contract: an outputSchema violating structured-output
+    // constraints is rejected here exactly as OpenAI would reject it at 3am.
+    const schemaViolations = options.outputSchema
+      ? structuredOutputSchemaViolations(options.outputSchema)
+      : [];
     const expectationFailure =
-      entry.requireOutputSchema && !options.outputSchema
-        ? "fake provider expected outputSchema"
-        : entry.expectReadOnly !== undefined && entry.expectReadOnly !== (options.readOnly ?? false)
-          ? `fake provider expected readOnly=${entry.expectReadOnly}`
-          : entry.expectModel !== undefined && entry.expectModel !== (options.model ?? null)
-            ? `fake provider expected model=${entry.expectModel ?? "unset"}`
-            : null;
+      schemaViolations.length > 0
+        ? `invalid_json_schema: ${schemaViolations.join("; ")}`
+        : entry.requireOutputSchema && !options.outputSchema
+          ? "fake provider expected outputSchema"
+          : entry.expectReadOnly !== undefined &&
+              entry.expectReadOnly !== (options.readOnly ?? false)
+            ? `fake provider expected readOnly=${entry.expectReadOnly}`
+            : entry.expectModel !== undefined && entry.expectModel !== (options.model ?? null)
+              ? `fake provider expected model=${entry.expectModel ?? "unset"}`
+              : null;
 
     const controller = new AbortController();
     const watchdog = new Watchdog(options.timeoutMs, options.idleTimeoutMs, () =>

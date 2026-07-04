@@ -36,7 +36,8 @@ export interface NotifyOptions {
 export type NotifyInput =
   | { event: "loop_stopped"; reason: StopReason; detail?: string }
   | { event: "open_question"; question: string }
-  | { event: "proposal_landed"; proposalId: string; selectedItems: number };
+  | { event: "proposal_landed"; proposalId: string; selectedItems: number }
+  | { event: "canary_failed"; detail: string };
 
 const DEFAULT_CONSOLE_URL = "http://127.0.0.1:4711";
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -70,6 +71,8 @@ export function buildNotifyPayload(ctx: ProjectContext, input: NotifyInput): Not
         proposalId: input.proposalId,
         selectedItems: input.selectedItems,
       };
+    case "canary_failed":
+      return { ...base, detail: input.detail };
   }
 }
 
