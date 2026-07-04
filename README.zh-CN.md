@@ -52,7 +52,7 @@ nightcrew report           # the morning after
 4. **repair** — 任何有类型失败（verify red、merge conflict、review changes-requested、timeout……）都会变成下一次迭代的聚焦 brief。
 5. **garden** — 周期性的控制面维护：清理过期 questions、整理 backlog，让小问题不要累积。
 
-当一个计划完成且门禁为绿色时，合并审查者会在新会话中根据计划阅读完整 diff。批准的工作会合回去并清理 worktree；被拒绝的工作会变成 repair brief；真正模糊的事项会升级到 `questions.md` 并停止该计划 — 异步进行，不阻塞夜晚的其他工作。
+当一个计划完成且门禁为绿色时，合并审查者会在新会话中根据计划阅读完整 diff。批准的工作会合回去（或在 `git.mergeMode: pr` 下推送分支并用 `gh` 开一个 GitHub PR），worktree 被清理，该计划覆盖的 BACKLOG 条目由确定性 runner 代码自动勾选——绝不是 agent 动手。被拒绝的工作会变成 repair brief；真正模糊的事项会升级到 `questions.md` 并停止该计划 — 异步进行，不阻塞夜晚的其他工作。
 
 标记为 `parallel: true` 的计划会在并发 worktree lane 中运行（受 `loop.maxParallelPlans` 限制）。`crew` daemon 会在你的 `schedule.windows`（例如 `"23:00-07:00"`）内同时驱动多个项目，每个仓库有一个项目锁，确保同一仓库不会被驱动两次。
 
@@ -77,12 +77,16 @@ nightcrew report           # the morning after
 里被自动分诊成一份待审 proposal（候选修复项）等你批准。每一条 BACKLOG
 仍然能追溯到你的一次点击 — agent 永远不会写 `crew.md`。
 
+不想主动轮询？配置 `notify.webhook` 后，loop 会在带类型停机、新 question
+落地、新 proposal 待审时 POST 一段紧凑 JSON——纯确定性代码、不调模型，
+推送失败也绝不拖垮 loop。
+
 ## 命令
 
 | 命令 | 作用 |
 | --- | --- |
-| `nightcrew init` | 搭建 `.nightcrew/`、修补 `.gitignore`、注册项目 |
-| `nightcrew doctor` | 预检本地运行时、仓库、config、registry 和 daemon lock |
+| `nightcrew init` | 搭建 `.nightcrew/`、修补 `.gitignore`、注册项目；`--assist` 用一次只读 Codex pass 起草 config 值和初始 rules（你确认后才写入） |
+| `nightcrew doctor` | 预检本地运行时、仓库、config、registry、daemon lock 和 Codex 登录凭据（同一检查会在 `loop` 与 `crew start` 启动时 fail-fast） |
 | `nightcrew run` | 运行一次迭代；`-o/--operation` 和 `-p/--plan` 可覆盖解析结果 |
 | `nightcrew loop` | 迭代运行，直到守卫、预算或 operator 停止它 |
 | `nightcrew status` | 查看 plans、streaks、worktrees、recent iterations |
@@ -114,6 +118,10 @@ verify:
         - { name: typecheck, run: npx tsc --noEmit }
 review:
   mode: gate          # off | advisory | gate
+git:
+  mergeMode: merge    # merge 本地合并 | pr: 推送分支并开 GitHub PR
+notify:
+  webhook: https://example.com/hook   # 可选推送：停机、questions、proposals
 schedule:
   windows: ["23:00-07:00"]
 loop:

@@ -79,9 +79,12 @@ across config, state, and console:
 
 When a plan is complete and gates are green, the merge reviewer reads the
 full diff against the plan on a fresh session. Approved work merges back
-and the worktree is cleaned up; rejected work becomes a repair brief;
-anything genuinely ambiguous escalates to `questions.md` and stops that
-plan — asynchronously, without blocking the rest of the night.
+(or, with `git.mergeMode: pr`, is pushed and opened as a GitHub pull
+request via `gh`), the worktree is cleaned up, and the plan's BACKLOG
+item is ticked off by deterministic runner code — never by the agent.
+Rejected work becomes a repair brief; anything genuinely ambiguous
+escalates to `questions.md` and stops that plan — asynchronously, without
+blocking the rest of the night.
 
 Plans marked `parallel: true` run in concurrent worktree lanes (bounded by
 `loop.maxParallelPlans`). The `crew` daemon drives many projects at once,
@@ -110,12 +113,17 @@ and new `qa.md` defect bullets are auto-triaged overnight into a pending
 proposal of fix candidates for you to approve. Every BACKLOG line still
 traces back to one of your clicks — agents never write `crew.md`.
 
+Prefer a push over polling? Configure `notify.webhook` and the loop POSTs
+compact JSON when it stops with a typed reason, when a question lands,
+and when a proposal awaits approval — deterministic code, no model calls,
+and delivery failures never break the loop.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `nightcrew init` | Scaffold `.nightcrew/`, patch `.gitignore`, register the project |
-| `nightcrew doctor` | Preflight the local runtime, repository, config, registry, and daemon lock |
+| `nightcrew init` | Scaffold `.nightcrew/`, patch `.gitignore`, register the project; `--assist` drafts config values and starter rules from one read-only Codex pass (applied only after you confirm) |
+| `nightcrew doctor` | Preflight the local runtime, repository, config, registry, daemon lock, and Codex auth (the same provider check fail-fasts `loop` and `crew start`) |
 | `nightcrew run` | One iteration; `-o/--operation` and `-p/--plan` override resolution |
 | `nightcrew loop` | Iterate until a guard, budget, or the operator stops it |
 | `nightcrew status` | Plans, streaks, worktrees, recent iterations |
@@ -147,6 +155,10 @@ verify:
         - { name: typecheck, run: npx tsc --noEmit }
 review:
   mode: gate          # off | advisory | gate
+git:
+  mergeMode: merge    # merge locally | pr: push + open a GitHub PR
+notify:
+  webhook: https://example.com/hook   # optional push: stops, questions, proposals
 schedule:
   windows: ["23:00-07:00"]
 loop:
