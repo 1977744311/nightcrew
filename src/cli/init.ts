@@ -25,6 +25,8 @@ const assistedInitDraftSchema = z.strictObject({
 });
 export type AssistedInitDraft = z.infer<typeof assistedInitDraftSchema>;
 
+// OpenAI structured outputs demand `required` to list every property key, so
+// timeoutMs is required here and the prompt asks for an explicit value.
 const COMMAND_STEP_OUTPUT_SCHEMA = {
   type: "object",
   properties: {
@@ -32,7 +34,7 @@ const COMMAND_STEP_OUTPUT_SCHEMA = {
     run: { type: "string" },
     timeoutMs: { type: "number" },
   },
-  required: ["name", "run"],
+  required: ["name", "run", "timeoutMs"],
   additionalProperties: false,
 } as const;
 
@@ -266,7 +268,7 @@ function initAssistPrompt(input: { projectName: string }): string {
     "- Draft 2-3 concise initial crew rules that reflect this repository's stack and conventions.",
     "",
     "Prefer deterministic local commands already implied by package managers, lockfiles, scripts, CI, or docs.",
-    "Keep commands non-interactive. Use realistic timeouts in milliseconds when a step needs more than the default.",
+    "Keep commands non-interactive. Every step must carry an explicit timeoutMs; use 600000 unless the step clearly needs more.",
     "If the repository has no clear install command, choose the smallest harmless bootstrap command that validates the checkout.",
     "",
     "Respond with ONLY this JSON object shape:",
