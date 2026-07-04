@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- 4b91ffe: The `propose list/review/refine/select` subcommands collapsed into flags on the one `propose` command: bare `nightcrew propose` lists pending proposals and reopens the latest picker (was `list` + `review`), `--proposal <id-or-file>` targets a specific pending proposal, `--ids 1,3` ratifies non-interactively (was `select`), and `--feedback "<text>"` regenerates (was `refine`).
+
+### Minor Changes
+
+- 4b91ffe: Added the operator approval inbox. Agents now record open questions with 2-4 lettered options (one `(recommended)`, `=> backlog: ...` on options that imply code work); the console renders them as a one-click panel where answering writes the decision back and schedules marked options straight into BACKLOG, while leaving feedback makes garden redraft the options next run. New `- ` defect bullets in `qa.md` are auto-triaged by the loop (once per content state) into a pending qa-sourced proposal of fix candidates, also available on demand via `nightcrew propose --from-qa`. Agents still never write `crew.md` — every scheduled line traces to an operator click.
+- aa322a3: Added the scheduled canary and structured-output schema guards, closing the gap where code whose correctness depends on live external systems passed every fake-provider test and still broke in production (as `init --assist` did). `canary.profile` points at a verify profile that the loop and `crew` daemon now run in the project root — outside any agent sandbox — at most once per `canary.everyHours`; a failing step is appended to `qa.md` (deduped) where overnight triage drafts fix candidates, and fires the new `canary_failed` notify event without ever blocking the loop. Output schemas handed to providers are now validated against OpenAI structured-output constraints: the fake provider rejects violating schemas exactly like the real API (`invalid_json_schema`), so any test that exercises a bad schema goes red before the first paid call.
+- 4b91ffe: `nightcrew propose` now runs a single balanced research pass by default, turning a goal into 1-3 ready-to-ratify BACKLOG candidates without cross-lens duplicates. The three competing research lenses (minimal / architecture-first / risk-first) move behind a new `--lenses` flag, and `propose refine` reruns whatever passes produced the source artifact.
+
+### Patch Changes
+
+- 9bd2729: Merge commits now fall back to the built-in agent identity when git has no user configured (same fallback the commit paths already had), so plan landings work on CI runners and fresh machines instead of failing as merge conflicts.
+
 ## Unreleased
 
 - Added `nightcrew init --assist`, an opt-in read-only Codex drafting path that
@@ -203,7 +219,7 @@ Phase 1 — Single-project one-shot vertical slice.
   verify → review → merge-back (`auto`/`branch` policies), plan lifecycle
   active → completed, worktree/branch cleanup, typed `merge_conflict` repair.
 - CLI: `run` (one iteration, auto-resolved operation), `status`, `plan
-  list/show`.
+list/show`.
 - Synthetic e2e suite on temp git repos: green path, session continuity,
   verify→repair, idle/overall timeouts, merge-conflict repair, idle BACKLOG,
   control-scope violations, protected-path enforcement.

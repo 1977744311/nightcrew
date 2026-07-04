@@ -1,6 +1,6 @@
 {
   "name": "nightcrew",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "Your coding agents on the night shift. A loop-engineering control plane for unattended, verify-gated agent iteration across Codex, Claude Code, and Cursor.",
   "license": "MIT",
   "type": "module",
