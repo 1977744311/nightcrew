@@ -54,7 +54,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "version-packages": "changeset version && npm install --package-lock-only"
   },
   "dependencies": {
     "@clack/core": "^1.4.2",

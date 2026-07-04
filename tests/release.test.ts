@@ -39,7 +39,10 @@ describe("release automation contract", () => {
       "pull-requests": "write",
     });
     expect(steps).toContainEqual(expect.objectContaining({ run: "npm run check" }));
-    expect(changesets?.with?.publish).toBe("npm publish --provenance");
+    // changeset publish (not bare npm publish) creates git tags and GitHub
+    // Releases; provenance still comes from publishConfig + id-token: write.
+    expect(changesets?.with?.publish).toBe("npx changeset publish");
+    expect(changesets?.with?.version).toBe("npm run version-packages");
     expect(changesets?.env).toMatchObject({
       GITHUB_TOKEN: secretExpression("GITHUB_TOKEN"),
       NPM_TOKEN: secretExpression("NPM_TOKEN"),

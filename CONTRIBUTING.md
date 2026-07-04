@@ -61,11 +61,13 @@ Release automation is intentionally operator-owned:
   commit tokens or place them in local config.
 - Normal flow: merge releasable changes with a changeset. The Release workflow
   runs `npm run check`, then `changesets/action` opens or updates the version
-  PR. The operator reviews that PR and merges it when ready to release.
+  PR (via `npm run version-packages`, which also refreshes the lockfile). The
+  operator reviews that PR and merges it when ready to release.
 - When the version PR lands on `main`, the same workflow publishes with
-  `npm publish --provenance`. The workflow grants `id-token: write`, and
-  `package.json` sets `publishConfig.provenance` so npm records provenance for
-  the package.
+  `changeset publish`, which also creates the git tag and GitHub Release. The
+  workflow grants `id-token: write`, and `package.json` sets
+  `publishConfig.provenance` so npm records provenance for the package
+  (equivalent to `npm publish --provenance`).
 
 Manual fallback if the workflow or npm token is unavailable:
 

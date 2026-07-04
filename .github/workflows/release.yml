@@ -29,6 +29,9 @@ jobs:
           # changeset publish (not bare npm publish) so tags + GitHub Releases
           # are created; provenance comes from publishConfig in package.json.
           publish: npx changeset publish
+          # version-packages also refreshes package-lock.json, otherwise the
+          # version PR leaves the lockfile pinned to the previous version.
+          version: npm run version-packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
