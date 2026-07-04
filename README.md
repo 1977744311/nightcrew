@@ -12,7 +12,7 @@ In the morning, `nightcrew report` tells you what landed, what failed, what
 it cost, and which decisions are waiting for you.
 
 It is a control plane *around* coding agents, not another agent. The agent
-(OpenAI Codex at 1.0, via the official SDK on your existing subscription)
+(OpenAI Codex today, via the official SDK on your existing subscription)
 does the coding; nightcrew does everything an unattended agent cannot be
 trusted to do itself: scope its writes, verify its claims, review its diffs,
 stop its spirals, and keep a durable ledger of every step.
@@ -207,11 +207,13 @@ const record = await runIteration(ctx, { provider, reviewer: buildReviewer(ctx.c
 
 ## Status
 
-1.0 ships Codex as the single deeply-polished executor behind a provider
-interface designed for more: Claude Code and Cursor adapters are the first
-post-1.0 milestone (`Provider` is ~one file to implement — see
-`src/providers/`). The `operation` model, config schema, CLI surface, and
-library exports are frozen under semver from 1.0.0.
+2.0 ships Codex as the single deeply-polished executor behind a provider
+interface designed for more: Claude Code and Cursor adapters are the next
+milestone (`Provider` is ~one file to implement — see `src/providers/`).
+The `operation` model, config schema, CLI surface, and library exports have
+been frozen under semver since 1.0.0 — 2.0.0 is that contract enforced:
+collapsing the `propose` subcommands into flags was a breaking CLI change,
+so the major version moved.
 
 ## License
 

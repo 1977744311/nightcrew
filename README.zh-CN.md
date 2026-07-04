@@ -6,7 +6,7 @@
 
 你用普通 markdown 写下 BACKLOG，然后去睡觉。nightcrew 会把它变成有边界的计划，在隔离的 git worktree 中执行每个计划，用你的测试套件和独立审查代理把关每次合并，并在无人值守时一轮又一轮地落地已验证的工作。早上，`nightcrew report` 会告诉你落地了什么、失败了什么、花费了多少，以及还有哪些决策在等你。
 
-它是围绕编码代理的控制平面，*不是*又一个代理。在 1.0 中，真正写代码的是代理（OpenAI Codex，通过官方 SDK 使用你现有的订阅）；nightcrew 负责所有不能让无人值守代理独自完成的事：限制写入范围、验证声明、审查 diff、停止循环失控，并为每一步保留持久账本。
+它是围绕编码代理的控制平面，*不是*又一个代理。目前真正写代码的是代理（OpenAI Codex，通过官方 SDK 使用你现有的订阅）；nightcrew 负责所有不能让无人值守代理独自完成的事：限制写入范围、验证声明、审查 diff、停止循环失控，并为每一步保留持久账本。
 
 ## 为什么存在
 
@@ -163,7 +163,7 @@ const record = await runIteration(ctx, { provider, reviewer: buildReviewer(ctx.c
 
 ## 状态
 
-1.0 将 Codex 作为唯一经过深度打磨的 executor，位于一个为更多 executor 设计的 provider interface 之后：Claude Code 和 Cursor adapters 是 1.0 之后的第一个里程碑（`Provider` 大约只需一个文件实现 — 见 `src/providers/`）。`operation` model、config schema、CLI surface 和 library exports 从 1.0.0 起按 semver 冻结。
+2.0 将 Codex 作为唯一经过深度打磨的 executor，位于一个为更多 executor 设计的 provider interface 之后：Claude Code 和 Cursor adapters 是下一个里程碑（`Provider` 大约只需一个文件实现 — 见 `src/providers/`）。`operation` model、config schema、CLI surface 和 library exports 自 1.0.0 起按 semver 冻结 — 2.0.0 正是这份契约的执行：`propose` 子命令收敛为 flags 属于破坏性 CLI 变更，主版本号随之提升。
 
 ## 许可证
 

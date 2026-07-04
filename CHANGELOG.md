@@ -16,7 +16,7 @@
 
 - 9bd2729: Merge commits now fall back to the built-in agent identity when git has no user configured (same fallback the commit paths already had), so plan landings work on CI runners and fresh machines instead of failing as merge conflicts.
 
-## Unreleased
+### Also in this release (logged before the changesets adoption)
 
 - Added `nightcrew init --assist`, an opt-in read-only Codex drafting path that
   prints suggested bootstrap, verify, base-branch, and crew-rule defaults before

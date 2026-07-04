@@ -66,17 +66,14 @@ reviewed, and merged **by nightcrew running unattended on this repository**.
 | v1.1.0 | First dogfood cycle: `nightcrew doctor`, `nightcrew plan add`, `crew report`, per-plan report breakdown, plan-index in the planner prompt, operator-owned `crew.md` (garden reports instead of editing) |
 | v1.2.0 | Propose: goal in, ratified backlog out — three research lenses (minimal / architecture-first / risk-first) in read-only passes, one stable proposal artifact, approval via checkbox TUI, `propose select --ids`, or the console |
 | v1.3.0 | Research quality: full item bodies before the picker, `propose refine` (feedback → regenerate with lineage), `provider.codex.webSearch` (`disabled\|cached\|live` + per-operation overrides) with cited sources in rationales, console per-plan accounting |
+| v1.4.0 | Polish: three concurrent propose passes with live per-lens progress, preview-pane picker, language mirroring, config JSON Schema for editor autocomplete, changesets release automation with npm provenance |
+| v2.0.0 | First npm publish. Propose collapsed to one command + flags (breaking; balanced single pass default, `--lenses` opt-in), operator approval inbox with `qa.md` auto-triage, `git.mergeMode: pr`, `init --assist`, scheduled canary + structured-output schema guards, merge identity fallback for bare CI runners |
 
 ## Next
 
 Queued in `.nightcrew/crew.md` BACKLOG (the crew builds these; this list is
 the roadmap-level intent):
 
-- **Config JSON Schema** generated from the zod schema, wired into
-  `nightcrew init` via a `yaml-language-server` header so `config.yaml`
-  autocompletes in editors.
-- **Release automation**: changesets-driven version PRs and
-  `npm publish --provenance` from CI (operator supplies `NPM_TOKEN`).
 - **Launch write-up**: "what 700+ unattended iterations taught us",
   drafted from this document, concepts, and the changelog.
 
@@ -92,7 +89,6 @@ Decision point held open on purpose:
 - Claude Agent SDK and Cursor SDK adapters; cross-vendor maker/checker
   review. Deferred until the operator green-lights them — Codex-only is a
   feature while the loop machinery is the product.
-- `pr` merge mode (open a PR instead of merging to base).
 - Webhook/event triggers beyond cron windows.
 - SQLite ledger and richer analytics; console split into a workspace package.
 
