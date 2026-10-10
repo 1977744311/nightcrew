@@ -136,7 +136,7 @@ webhook; the loop itself keeps going.
 | `nightcrew run` | One iteration; `-o/--operation` and `-p/--plan` override resolution |
 | `nightcrew loop` | Iterate until a guard, budget, or the operator stops it |
 | `nightcrew status` | Plans, streaks, worktrees, recent iterations |
-| `nightcrew report` | Morning digest: landed, failed, cost, open questions |
+| `nightcrew report` | Morning digest: a one-line verdict and a shift strip of the night, then landed, failed, cost, open questions |
 | `nightcrew plan add <title>` | Create an active plan scaffold |
 | `nightcrew propose "<goal>"` | One research pass drafts BACKLOG candidates (`--lenses` runs 3 competing passes, `--from-qa` drafts from qa.md defects); pick via checkbox TUI, `--ids 1,3`, or the console. Bare `propose` resumes pending drafts; `--feedback "<text>"` regenerates |
 | `nightcrew plan list/show` | Inspect plans |
