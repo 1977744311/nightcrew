@@ -7,6 +7,7 @@ import { listPlans } from "../plans/plans";
 import { readHistory } from "../state/history";
 import { readState } from "../state/state";
 import { readTextIfExists } from "../utils/fs";
+import { renderShift, type ShiftEntry, toShiftEntries } from "./shift-strip";
 
 export interface ReportData {
   project: string;
@@ -19,6 +20,8 @@ export interface ReportData {
     idle: number;
     quota: number;
   };
+  /** One entry per ledger record, oldest start first: the data behind the shift strip. */
+  timeline: ShiftEntry[];
   plans: ReportPlanBreakdown[];
   landed: Array<{ planId: string; title: string; commits: number }>;
   commits: number;
@@ -107,6 +110,7 @@ export function buildReport(ctx: ProjectContext, sinceMs: number): ReportData {
     since: since.toISOString(),
     until: new Date(now).toISOString(),
     iterations,
+    timeline: toShiftEntries(history),
     plans: planMetrics.map(({ planId, title, iterations, usage, totalTokens, landed }) => ({
       planId,
       title,
@@ -142,6 +146,14 @@ export function renderReport(report: ReportData): string {
   lines.push(
     pc.bold(`☾ ${report.project}`) +
       pc.dim(`  last ${hours}h  (${report.since.slice(5, 16)} → ${report.until.slice(5, 16)})`),
+  );
+  lines.push("");
+
+  lines.push(
+    ...renderShift(
+      { iterations: report.iterations, landed: report.landed.length, timeline: report.timeline },
+      { columns: process.stdout.columns },
+    ),
   );
   lines.push("");
 

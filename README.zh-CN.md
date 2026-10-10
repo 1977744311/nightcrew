@@ -96,7 +96,7 @@ fake-provider 测试证明不了真实集成（真的 provider 调用、`gh` 认
 | `nightcrew run` | 运行一次迭代；`-o/--operation` 和 `-p/--plan` 可覆盖解析结果 |
 | `nightcrew loop` | 迭代运行，直到守卫、预算或 operator 停止它 |
 | `nightcrew status` | 查看 plans、streaks、worktrees、recent iterations |
-| `nightcrew report` | 早晨摘要：landed、failed、cost、open questions |
+| `nightcrew report` | 早晨摘要：一句话结论加一条整晚的班次时间线，然后是 landed、failed、cost、open questions |
 | `nightcrew plan add <title>` | 创建 active plan 脚手架 |
 | `nightcrew propose "<goal>"` | 单个 research pass 起草 BACKLOG candidates（`--lenses` 跑 3 个竞争 passes，`--from-qa` 从 qa.md 缺陷起草）；通过 checkbox TUI、`--ids 1,3` 或 console 选择。裸跑 `propose` 续审 pending 草稿；`--feedback "<text>"` 重新生成 |
 | `nightcrew plan list/show` | 查看 plans |
